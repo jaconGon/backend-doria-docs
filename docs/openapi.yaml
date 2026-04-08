@@ -1,1 +1,1208 @@
 
+openapi: 3.1.0
+info:
+  title: Backend Doria API
+  version: 1.0.0
+  description: |
+    Especificação OpenAPI 3.1 gerada a partir do código do backend Dor.ia.
+
+    Observações:
+    - As rotas protegidas aceitam autenticação por cookie (`token`) ou por header `Authorization: Bearer <jwt>`.
+    - O token retornado em `POST /login` é o JWT de sessão local do backend.
+    - `POST /auth/session` e `POST /auth/onboard` criam a sessão local a partir de um `access_token` do Supabase.
+    - `POST /send-message-n8n` apenas repassa a resposta do n8n; por isso a resposta está documentada como objeto genérico.
+servers:
+  - url: https://api.falecomadoria.com.br
+    description: Produção
+  - url: http://localhost:3433
+    description: Local
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Chat
+  - name: Agenda Doria
+  - name: Registro de Dor
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      summary: Verifica se existe uma sessão ativa via cookie
+      description: |
+        Retorna se o backend reconhece uma sessão válida no cookie `token`.
+        Esta rota não usa o header Bearer; ela verifica apenas o cookie.
+      responses:
+        "200":
+          description: Status da API e presença de sessão no cookie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                semSessao:
+                  value:
+                    Status: Success
+                    hasSession: false
+                comSessao:
+                  value:
+                    Status: Success
+                    hasSession: true
+
+  /auth/signup:
+    post:
+      tags: [Auth]
+      summary: Cadastra usuário com email e senha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthSignupRequest"
+      responses:
+        "200":
+          description: Cadastro realizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSignupResponse"
+        "400":
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Usuário já existe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro interno
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /login:
+    post:
+      tags: [Auth]
+      summary: Faz login com email e senha
+      description: |
+        Autentica no Supabase, cria o cookie `token` e também retorna o JWT de sessão local no campo `token`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login realizado com sucesso
+          headers:
+            Set-Cookie:
+              description: Cookie de sessão `token`
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Credenciais inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: E-mail ainda não confirmado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/session:
+    post:
+      tags: [Auth]
+      summary: Cria sessão local a partir de access token do Supabase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessTokenRequest"
+      responses:
+        "200":
+          description: Sessão criada com sucesso
+          headers:
+            Set-Cookie:
+              description: Cookie de sessão `token`
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionResponse"
+        "400":
+          description: access_token ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Perfil não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/onboard:
+    post:
+      tags: [Auth]
+      summary: Alias de onboarding a partir de access token do Supabase
+      description: Mantém compatibilidade com fluxo pós-OAuth ou confirmação de conta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessTokenRequest"
+      responses:
+        "200":
+          description: Sessão criada com sucesso
+          headers:
+            Set-Cookie:
+              description: Cookie de sessão `token`
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionResponse"
+        "400":
+          description: access_token ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Perfil não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Solicita recuperação de senha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+      responses:
+        "200":
+          description: Solicitação enviada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusOkResponse"
+        "400":
+          description: E-mail ausente ou falha na solicitação
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/update-password:
+    post:
+      tags: [Auth]
+      summary: Atualiza a senha a partir de access token do usuário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePasswordRequest"
+      responses:
+        "200":
+          description: Senha atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatePasswordResponse"
+        "400":
+          description: Dados inválidos ou falha na atualização
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Retorna a sessão ativa atual
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Sessão válida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMeResponse"
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Encerra a sessão local
+      responses:
+        "200":
+          description: Logout realizado
+          headers:
+            Set-Cookie:
+              description: Limpeza do cookie `token`
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutResponse"
+
+  /consent:
+    post:
+      tags: [Chat]
+      summary: Cria sessão anônima para consentimento do chat
+      description: Gera uma sessão anônima e grava o cookie `token`.
+      responses:
+        "200":
+          description: Consentimento aceito
+          headers:
+            Set-Cookie:
+              description: Cookie de sessão `token`
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentResponse"
+
+  /send-message-n8n:
+    post:
+      tags: [Chat]
+      summary: Envia mensagem para o webhook do n8n
+      description: |
+        Requer sessão ativa. O backend envia `{ identifier, message }` para o n8n,
+        onde `identifier` é o `sub` do usuário autenticado.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "200":
+          description: Resposta devolvida pelo n8n
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Campo message ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Não autenticado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Falha ao chamar o n8n
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agenda-doria:
+    post:
+      tags: [Agenda Doria]
+      summary: Cria um item da agenda Doria
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgendaDoriaCreateRequest"
+      responses:
+        "201":
+          description: Item criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgendaDoriaCreateResponse"
+        "400":
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao inserir na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Agenda Doria]
+      summary: Lista os itens da agenda Doria do usuário autenticado
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista retornada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgendaDoriaListResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao consultar a base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agenda-doria/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    patch:
+      tags: [Agenda Doria]
+      summary: Atualiza parcialmente um item da agenda Doria
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgendaDoriaUpdateRequest"
+      responses:
+        "200":
+          description: Item atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgendaDoriaUpdateResponse"
+        "400":
+          description: Dados inválidos ou nenhum campo válido informado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Item ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao atualizar na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Agenda Doria]
+      summary: Remove um item da agenda Doria
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Item removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgendaDoriaDeleteResponse"
+        "400":
+          description: Parâmetro id inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Item ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao deletar da base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /registro-dor:
+    post:
+      tags: [Registro de Dor]
+      summary: Cria um registro de dor
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistroDorCreateRequest"
+      responses:
+        "201":
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistroDorCreateResponse"
+        "400":
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao inserir na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Registro de Dor]
+      summary: Lista os registros de dor do usuário autenticado
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista retornada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistroDorListResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao consultar a base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /registro-dor/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    patch:
+      tags: [Registro de Dor]
+      summary: Atualiza parcialmente um registro de dor
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistroDorUpdateRequest"
+      responses:
+        "200":
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistroDorUpdateResponse"
+        "400":
+          description: Dados inválidos ou nenhum campo válido informado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Item ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao atualizar na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Registro de Dor]
+      summary: Remove um registro de dor
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Registro removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistroDorDeleteResponse"
+        "400":
+          description: Parâmetro id inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Item ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao deletar da base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: Identificador numérico do recurso
+      schema:
+        type: integer
+        minimum: 1
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT retornado pelo endpoint `/login`
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+      description: Cookie de sessão local criado pelo backend
+
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [Error]
+      properties:
+        Error:
+          type: string
+          example: you are not authenticated
+
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, hasSession]
+      properties:
+        Status:
+          type: string
+          example: Success
+        hasSession:
+          type: boolean
+
+    StatusOkResponse:
+      type: object
+      additionalProperties: false
+      required: [Status]
+      properties:
+        Status:
+          type: string
+          example: ok
+
+    LogoutResponse:
+      type: object
+      additionalProperties: false
+      required: [Status]
+      properties:
+        Status:
+          type: string
+          example: Logged out
+
+    ConsentResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, created]
+      properties:
+        Status:
+          type: string
+          example: Consent accepted
+        created:
+          type: boolean
+          example: true
+
+    AccessTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [access_token]
+      properties:
+        access_token:
+          type: string
+          minLength: 1
+
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    UpdatePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [access_token, newPassword]
+      properties:
+        access_token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 1
+
+    UpdatePasswordResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, updated]
+      properties:
+        Status:
+          type: string
+          example: ok
+        updated:
+          type: boolean
+          example: true
+
+    AuthSignupRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        nome:
+          type: string
+        tipo:
+          type: string
+          example: paciente
+        cpf:
+          type: string
+
+    AuthSignupResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, auth_id, email, needs_email_confirm]
+      properties:
+        Status:
+          type: string
+          example: created
+        auth_id:
+          type: string
+        email:
+          type: string
+          format: email
+        needs_email_confirm:
+          type: boolean
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    UsuarioResumo:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        auth_id:
+          type: string
+        nome:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+        tipo:
+          type: string
+          nullable: true
+        cpf:
+          type: string
+          nullable: true
+
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, token, user]
+      properties:
+        Status:
+          type: string
+          example: success
+        token:
+          type: string
+          description: JWT de sessão local do backend
+        user:
+          type: object
+          additionalProperties: false
+          required: [nome, email, tipo]
+          properties:
+            nome:
+              type: string
+              nullable: true
+            email:
+              type: string
+              format: email
+            tipo:
+              type: string
+              nullable: true
+
+    AuthSessionResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, user]
+      properties:
+        Status:
+          type: string
+          example: success
+        user:
+          $ref: "#/components/schemas/UsuarioResumo"
+
+    JwtSessionPayload:
+      type: object
+      additionalProperties: false
+      required: [sub, last, anon]
+      properties:
+        sub:
+          type: string
+          description: auth_id do usuário ou UUID anônimo
+        last:
+          type: integer
+          description: timestamp em milissegundos da última atividade
+        anon:
+          type: boolean
+        doctorId:
+          type: string
+        nome:
+          type: string
+        email:
+          type: string
+          format: email
+        tipo:
+          type: string
+        cpf:
+          type: string
+
+    AuthMeResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, user]
+      properties:
+        Status:
+          type: string
+          example: ok
+        user:
+          $ref: "#/components/schemas/JwtSessionPayload"
+
+    SendMessageRequest:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+
+    AgendaDoria:
+      type: object
+      additionalProperties: false
+      required: [id, uuid, nome, comeco, fim, horarios, tipo]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        uuid:
+          type: string
+        nome:
+          type: string
+        comeco:
+          type: string
+          format: date
+        fim:
+          type: string
+          format: date
+        horarios:
+          type: string
+          description: Texto livre com horários
+          example: 08:00, 10:00, 14:00
+        tipo:
+          type: integer
+
+    AgendaDoriaCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [nome, comeco, fim, horarios, tipo]
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        comeco:
+          type: string
+          format: date
+        fim:
+          type: string
+          format: date
+        horarios:
+          type: string
+          minLength: 1
+        tipo:
+          type: integer
+
+    AgendaDoriaUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        nome:
+          type: string
+        comeco:
+          type: string
+          format: date
+        fim:
+          type: string
+          format: date
+        horarios:
+          type: string
+        tipo:
+          type: integer
+      description: Envie ao menos um dos campos acima. O campo `uuid` não é permitido.
+
+    AgendaDoriaCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, agenda_doria]
+      properties:
+        Status:
+          type: string
+          example: created
+        agenda_doria:
+          $ref: "#/components/schemas/AgendaDoria"
+
+    AgendaDoriaUpdateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, agenda_doria]
+      properties:
+        Status:
+          type: string
+          example: updated
+        agenda_doria:
+          $ref: "#/components/schemas/AgendaDoria"
+
+    AgendaDoriaDeleteResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, agenda_doria]
+      properties:
+        Status:
+          type: string
+          example: deleted
+        agenda_doria:
+          $ref: "#/components/schemas/AgendaDoria"
+
+    AgendaDoriaListResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, total, agenda_doria]
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+          minimum: 0
+        agenda_doria:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgendaDoria"
+
+    RegistroDor:
+      type: object
+      additionalProperties: false
+      required: [id, uuid, dia, registro, nivel_de_dor]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        uuid:
+          type: string
+        dia:
+          type: string
+          format: date
+        registro:
+          type: string
+        nivel_de_dor:
+          type: integer
+
+    RegistroDorCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [dia, registro, nivel_de_dor]
+      properties:
+        dia:
+          type: string
+          format: date
+        registro:
+          type: string
+          minLength: 1
+        nivel_de_dor:
+          type: integer
+
+    RegistroDorUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        dia:
+          type: string
+          format: date
+        registro:
+          type: string
+        nivel_de_dor:
+          type: integer
+      description: Envie ao menos um dos campos acima. O campo `uuid` não é permitido.
+
+    RegistroDorCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, registro_dor]
+      properties:
+        Status:
+          type: string
+          example: created
+        registro_dor:
+          $ref: "#/components/schemas/RegistroDor"
+
+    RegistroDorUpdateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, registro_dor]
+      properties:
+        Status:
+          type: string
+          example: updated
+        registro_dor:
+          $ref: "#/components/schemas/RegistroDor"
+
+    RegistroDorDeleteResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, registro_dor]
+      properties:
+        Status:
+          type: string
+          example: deleted
+        registro_dor:
+          $ref: "#/components/schemas/RegistroDor"
+
+    RegistroDorListResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, total, registro_dor]
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+          minimum: 0
+        registro_dor:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegistroDor"
