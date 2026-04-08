@@ -10,7 +10,6 @@ info:
     - As rotas protegidas aceitam autenticação por cookie (`token`) ou por header `Authorization: Bearer <jwt>`.
     - O token retornado em `POST /login` é o JWT de sessão local do backend.
     - `POST /auth/session` e `POST /auth/onboard` criam a sessão local a partir de um `access_token` do Supabase.
-    - `POST /send-message-n8n` apenas repassa a resposta do n8n; por isso a resposta está documentada como objeto genérico.
 servers:
   - url: https://api.falecomadoria.com.br
     description: Produção
