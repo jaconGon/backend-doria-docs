@@ -1,8 +1,7 @@
-
 openapi: 3.1.0
 info:
   title: Backend Doria API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Especificação OpenAPI 3.1 gerada a partir do código do backend Dor.ia.
 
@@ -10,6 +9,8 @@ info:
     - As rotas protegidas aceitam autenticação por cookie (`token`) ou por header `Authorization: Bearer <jwt>`.
     - O token retornado em `POST /login` é o JWT de sessão local do backend.
     - `POST /auth/session` e `POST /auth/onboard` criam a sessão local a partir de um `access_token` do Supabase.
+    - Os recursos associados ao usuário autenticado resolvem o `uuid` a partir do `auth_id` presente na sessão.
+
 servers:
   - url: https://api.falecomadoria.com.br
     description: Produção
@@ -22,6 +23,9 @@ tags:
   - name: Chat
   - name: Agenda Doria
   - name: Registro de Dor
+  - name: Usuário
+  - name: Especialista SBED
+  - name: Medicações
 
 paths:
   /:
@@ -737,6 +741,502 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /usuario:
+    get:
+      tags: [Usuário]
+      summary: Retorna o usuário autenticado
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Usuário retornado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioGetResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao consultar a base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Usuário]
+      summary: Atualiza os dados do usuário autenticado
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsuarioUpdateRequest"
+      responses:
+        "200":
+          description: Usuário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioUpdateResponse"
+        "400":
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao atualizar na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Usuário]
+      summary: Remove o usuário autenticado da tabela usuario
+      description: |
+        Remove apenas o registro da tabela `usuario`.
+        Não remove a conta em `auth.users` do Supabase.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Usuário removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioDeleteResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao deletar da base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /especialista-sbed:
+    post:
+      tags: [Especialista SBED]
+      summary: Cria um especialista SBED vinculado ao usuário autenticado
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EspecialistaSbedCreateRequest"
+      responses:
+        "201":
+          description: Especialista criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaSbedCreateResponse"
+        "400":
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao inserir na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Especialista SBED]
+      summary: Lista os especialistas SBED do usuário autenticado
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista retornada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaSbedListResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao consultar a base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /especialista-sbed/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    patch:
+      tags: [Especialista SBED]
+      summary: Atualiza parcialmente um especialista SBED
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EspecialistaSbedUpdateRequest"
+      responses:
+        "200":
+          description: Especialista atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaSbedUpdateResponse"
+        "400":
+          description: Dados inválidos ou nenhum campo válido informado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Especialista ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao atualizar na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Especialista SBED]
+      summary: Remove um especialista SBED
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Especialista removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaSbedDeleteResponse"
+        "400":
+          description: Parâmetro id inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Especialista ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao deletar da base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /medicacoes:
+    post:
+      tags: [Medicações]
+      summary: Cria uma medicação
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MedicacaoCreateRequest"
+      responses:
+        "201":
+          description: Medicação criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicacaoCreateResponse"
+        "400":
+          description: Dados inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao inserir na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      tags: [Medicações]
+      summary: Lista as medicações do usuário autenticado
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista retornada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicacaoListResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Usuário não encontrado na tabela usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao consultar a base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /medicacoes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdParam"
+    patch:
+      tags: [Medicações]
+      summary: Atualiza parcialmente uma medicação
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MedicacaoUpdateRequest"
+      responses:
+        "200":
+          description: Medicação atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicacaoUpdateResponse"
+        "400":
+          description: Dados inválidos ou nenhum campo válido informado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Medicação ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao atualizar na base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Medicações]
+      summary: Remove uma medicação
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Medicação removida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicacaoDeleteResponse"
+        "400":
+          description: Parâmetro id inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sessão inválida ou ausente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Medicação ou usuário não encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "440":
+          description: Sessão expirada por inatividade
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Erro ao deletar da base
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   parameters:
     IdParam:
@@ -1000,10 +1500,150 @@ components:
           type: string
           minLength: 1
 
+    Usuario:
+      type: object
+      additionalProperties: false
+      required:
+        - uuid
+        - auth_id
+        - nome
+        - cpf
+        - created_at
+        - email
+        - tipo
+        - data_nascimento
+        - telefone_pessoal
+        - cep_pessoal
+        - rua_pessoal
+        - cidade_pessoal
+        - estado_pessoal
+        - bairro_pessoal
+        - complemento_pessoal
+        - numero_endereco_pessoal
+      properties:
+        uuid:
+          type: string
+        auth_id:
+          type: string
+        nome:
+          type: string
+          nullable: true
+        cpf:
+          type: string
+          nullable: true
+          pattern: '^[0-9]{11}$'
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        tipo:
+          type: string
+          nullable: true
+        data_nascimento:
+          type: string
+          format: date
+          nullable: true
+        telefone_pessoal:
+          type: string
+          nullable: true
+        cep_pessoal:
+          type: string
+          nullable: true
+        rua_pessoal:
+          type: string
+          nullable: true
+        cidade_pessoal:
+          type: string
+          nullable: true
+        estado_pessoal:
+          type: string
+          nullable: true
+        bairro_pessoal:
+          type: string
+          nullable: true
+        complemento_pessoal:
+          type: string
+          nullable: true
+        numero_endereco_pessoal:
+          type: string
+          nullable: true
+
+    UsuarioGetResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, usuario]
+      properties:
+        Status:
+          type: string
+          example: success
+        usuario:
+          $ref: "#/components/schemas/Usuario"
+
+    UsuarioUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        nome:
+          type: string
+        cpf:
+          type: string
+          pattern: '^[0-9]{11}$'
+        email:
+          type: string
+        tipo:
+          type: string
+        data_nascimento:
+          type: string
+          format: date
+        telefone_pessoal:
+          type: string
+        cep_pessoal:
+          type: string
+        rua_pessoal:
+          type: string
+        cidade_pessoal:
+          type: string
+        estado_pessoal:
+          type: string
+        bairro_pessoal:
+          type: string
+        complemento_pessoal:
+          type: string
+        numero_endereco_pessoal:
+          type: string
+      description: |
+        Envie um ou mais campos do perfil.
+        Os campos `uuid`, `auth_id` e `created_at` não são permitidos.
+
+    UsuarioUpdateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, usuario]
+      properties:
+        Status:
+          type: string
+          example: updated
+        usuario:
+          $ref: "#/components/schemas/Usuario"
+
+    UsuarioDeleteResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, usuario]
+      properties:
+        Status:
+          type: string
+          example: deleted
+        usuario:
+          $ref: "#/components/schemas/Usuario"
+
     AgendaDoria:
       type: object
       additionalProperties: false
-      required: [id, uuid, nome, comeco, fim, horarios, tipo]
+      required: [id, uuid, nome, data, horario]
       properties:
         id:
           type: integer
@@ -1012,38 +1652,30 @@ components:
           type: string
         nome:
           type: string
-        comeco:
+          nullable: true
+        data:
           type: string
           format: date
-        fim:
+          nullable: true
+        horario:
           type: string
-          format: date
-        horarios:
-          type: string
-          description: Texto livre com horários
-          example: 08:00, 10:00, 14:00
-        tipo:
-          type: integer
+          nullable: true
+          example: 14:30
 
     AgendaDoriaCreateRequest:
       type: object
       additionalProperties: false
-      required: [nome, comeco, fim, horarios, tipo]
+      required: [nome, data, horario]
       properties:
         nome:
           type: string
           minLength: 1
-        comeco:
+        data:
           type: string
           format: date
-        fim:
-          type: string
-          format: date
-        horarios:
+        horario:
           type: string
           minLength: 1
-        tipo:
-          type: integer
 
     AgendaDoriaUpdateRequest:
       type: object
@@ -1051,16 +1683,11 @@ components:
       properties:
         nome:
           type: string
-        comeco:
+        data:
           type: string
           format: date
-        fim:
+        horario:
           type: string
-          format: date
-        horarios:
-          type: string
-        tipo:
-          type: integer
       description: Envie ao menos um dos campos acima. O campo `uuid` não é permitido.
 
     AgendaDoriaCreateResponse:
@@ -1205,3 +1832,337 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RegistroDor"
+
+    EspecialistaSbed:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - nome
+        - clinica
+        - estado
+        - telefone_de_contato
+        - email_profissional
+        - horario_atendimento
+        - site
+        - especialidade
+        - cidade
+        - rua
+        - cep
+        - atendimento
+        - sugerido
+        - email_de_contato
+        - usuario_id
+        - complemento
+        - numero
+        - bairro
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        nome:
+          type: string
+          nullable: true
+        clinica:
+          type: string
+          nullable: true
+        estado:
+          type: string
+          nullable: true
+        telefone_de_contato:
+          type: string
+          nullable: true
+        email_profissional:
+          type: string
+          nullable: true
+        horario_atendimento:
+          type: string
+          nullable: true
+        site:
+          type: string
+          nullable: true
+        especialidade:
+          type: string
+          nullable: true
+        cidade:
+          type: string
+          nullable: true
+        rua:
+          type: string
+          nullable: true
+        cep:
+          type: string
+          nullable: true
+        atendimento:
+          type: string
+          nullable: true
+        sugerido:
+          type: integer
+          nullable: true
+        email_de_contato:
+          type: string
+          nullable: true
+        usuario_id:
+          type: string
+          nullable: true
+        complemento:
+          type: string
+          nullable: true
+        numero:
+          type: string
+          nullable: true
+        bairro:
+          type: string
+          nullable: true
+
+    EspecialistaSbedCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [nome]
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        clinica:
+          type: string
+        estado:
+          type: string
+        telefone_de_contato:
+          type: string
+        email_profissional:
+          type: string
+        horario_atendimento:
+          type: string
+        site:
+          type: string
+        especialidade:
+          type: string
+        cidade:
+          type: string
+        rua:
+          type: string
+        cep:
+          type: string
+        atendimento:
+          type: string
+        sugerido:
+          type: integer
+        email_de_contato:
+          type: string
+        complemento:
+          type: string
+        numero:
+          type: string
+        bairro:
+          type: string
+      description: Os campos `id` e `usuario_id` não são permitidos nesta rota.
+
+    EspecialistaSbedUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        nome:
+          type: string
+        clinica:
+          type: string
+        estado:
+          type: string
+        telefone_de_contato:
+          type: string
+        email_profissional:
+          type: string
+        horario_atendimento:
+          type: string
+        site:
+          type: string
+        especialidade:
+          type: string
+        cidade:
+          type: string
+        rua:
+          type: string
+        cep:
+          type: string
+        atendimento:
+          type: string
+        sugerido:
+          type: integer
+        email_de_contato:
+          type: string
+        complemento:
+          type: string
+        numero:
+          type: string
+        bairro:
+          type: string
+      description: Envie ao menos um dos campos acima. O campo `usuario_id` não é permitido.
+
+    EspecialistaSbedCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, especialista_sbed]
+      properties:
+        Status:
+          type: string
+          example: created
+        especialista_sbed:
+          $ref: "#/components/schemas/EspecialistaSbed"
+
+    EspecialistaSbedUpdateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, especialista_sbed]
+      properties:
+        Status:
+          type: string
+          example: updated
+        especialista_sbed:
+          $ref: "#/components/schemas/EspecialistaSbed"
+
+    EspecialistaSbedDeleteResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, especialista_sbed]
+      properties:
+        Status:
+          type: string
+          example: deleted
+        especialista_sbed:
+          $ref: "#/components/schemas/EspecialistaSbed"
+
+    EspecialistaSbedListResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, total, especialista_sbed]
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+          minimum: 0
+        especialista_sbed:
+          type: array
+          items:
+            $ref: "#/components/schemas/EspecialistaSbed"
+
+    Medicacao:
+      type: object
+      additionalProperties: false
+      required: [id, uuid, nome, frequencia, inicio, fim, tipo, tomou]
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        uuid:
+          type: string
+        nome:
+          type: string
+          nullable: true
+        frequencia:
+          type: string
+          nullable: true
+        inicio:
+          type: string
+          format: date-time
+          nullable: true
+        fim:
+          type: string
+          format: date-time
+          nullable: true
+        tipo:
+          type: integer
+          nullable: true
+        tomou:
+          type: integer
+          nullable: true
+
+    MedicacaoCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [nome]
+      properties:
+        nome:
+          type: string
+          minLength: 1
+        frequencia:
+          type: string
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+        tipo:
+          type: integer
+        tomou:
+          type: integer
+
+    MedicacaoUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        nome:
+          type: string
+        frequencia:
+          type: string
+        inicio:
+          type: string
+          format: date-time
+        fim:
+          type: string
+          format: date-time
+        tipo:
+          type: integer
+        tomou:
+          type: integer
+      description: Envie ao menos um dos campos acima. O campo `uuid` não é permitido.
+
+    MedicacaoCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, medicacao]
+      properties:
+        Status:
+          type: string
+          example: created
+        medicacao:
+          $ref: "#/components/schemas/Medicacao"
+
+    MedicacaoUpdateResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, medicacao]
+      properties:
+        Status:
+          type: string
+          example: updated
+        medicacao:
+          $ref: "#/components/schemas/Medicacao"
+
+    MedicacaoDeleteResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, medicacao]
+      properties:
+        Status:
+          type: string
+          example: deleted
+        medicacao:
+          $ref: "#/components/schemas/Medicacao"
+
+    MedicacaoListResponse:
+      type: object
+      additionalProperties: false
+      required: [Status, total, medicacoes]
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+          minimum: 0
+        medicacoes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Medicacao"
