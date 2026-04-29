@@ -1,15 +1,17 @@
 openapi: 3.1.0
 info:
-  title: Backend Doria API
-  version: 1.1.0
+  title: Backend Doria API 1.2
+  version: 2.0.0
   description: |
-    Especificação OpenAPI 3.1 gerada a partir do código do backend Dor.ia.
+    Especificação OpenAPI 3.1 atualizada a partir do backend Fastify.
 
     Observações:
-    - As rotas protegidas aceitam autenticação por cookie (`token`) ou por header `Authorization: Bearer <jwt>`.
+    - Rotas protegidas aceitam autenticação por cookie `token` ou por header `Authorization: Bearer <jwt>`.
     - O token retornado em `POST /login` é o JWT de sessão local do backend.
-    - `POST /auth/session` e `POST /auth/onboard` criam a sessão local a partir de um `access_token` do Supabase.
-    - Os recursos associados ao usuário autenticado resolvem o `uuid` a partir do `auth_id` presente na sessão.
+    - `POST /auth/session` e `POST /auth/onboard` criam sessão local a partir de um `access_token` do Supabase.
+    - Os recursos associados ao usuário autenticado resolvem o `id_usuario` a partir do `auth_id` presente na sessão.
+    - As tabelas novas estão no schema `doria`.
+    - As rotas CRUD usam validação interna e bloqueiam alteração de campos protegidos como IDs e campos de criação.
 
 servers:
   - url: https://api.falecomadoria.com.br
@@ -21,41 +23,44 @@ tags:
   - name: Health
   - name: Auth
   - name: Chat
-  - name: Agenda Doria
-  - name: Registro de Dor
   - name: Usuário
+  - name: Consultas
+  - name: Agenda Doria
+  - name: Minha Jornada
+  - name: Registro de Dor
+  - name: Especialistas
   - name: Especialista SBED
+  - name: Clínicas
+  - name: Convênios
+  - name: Endereços
+  - name: Horário de Atendimento
   - name: Medicações
+  - name: Controle de Medicações
 
 paths:
   /:
     get:
-      tags: [Health]
-      summary: Verifica se existe uma sessão ativa via cookie
+      tags:
+        - Health
+      summary: Verifica se existe sessão ativa via cookie
       description: |
-        Retorna se o backend reconhece uma sessão válida no cookie `token`.
-        Esta rota não usa o header Bearer; ela verifica apenas o cookie.
+        Verifica apenas o cookie `token`.
+        Não utiliza header `Authorization`.
+      operationId: healthCheck
       responses:
         "200":
-          description: Status da API e presença de sessão no cookie
+          description: Status da API e presença de sessão
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
-              examples:
-                semSessao:
-                  value:
-                    Status: Success
-                    hasSession: false
-                comSessao:
-                  value:
-                    Status: Success
-                    hasSession: true
 
   /auth/signup:
     post:
-      tags: [Auth]
-      summary: Cadastra usuário com email e senha
+      tags:
+        - Auth
+      summary: Cadastra usuário com e-mail e senha
+      operationId: authSignup
       requestBody:
         required: true
         content:
@@ -70,11 +75,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthSignupResponse"
         "400":
-          description: Dados inválidos
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "409":
           description: Usuário já existe
           content:
@@ -82,18 +83,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Erro interno
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/InternalServerError"
 
   /login:
     post:
-      tags: [Auth]
-      summary: Faz login com email e senha
+      tags:
+        - Auth
+      summary: Faz login com e-mail e senha
       description: |
-        Autentica no Supabase, cria o cookie `token` e também retorna o JWT de sessão local no campo `token`.
+        Autentica no Supabase, cria o cookie `token` e retorna o JWT de sessão local no campo `token`.
+      operationId: login
       requestBody:
         required: true
         content:
@@ -113,22 +112,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/LoginResponse"
         "401":
-          description: Credenciais inválidas
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "403":
-          description: E-mail ainda não confirmado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Forbidden"
 
   /auth/session:
     post:
-      tags: [Auth]
+      tags:
+        - Auth
       summary: Cria sessão local a partir de access token do Supabase
+      operationId: authSession
       requestBody:
         required: true
         content:
@@ -148,29 +141,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthSessionResponse"
         "400":
-          description: access_token ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Perfil não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
 
   /auth/onboard:
     post:
-      tags: [Auth]
+      tags:
+        - Auth
       summary: Alias de onboarding a partir de access token do Supabase
       description: Mantém compatibilidade com fluxo pós-OAuth ou confirmação de conta.
+      operationId: authOnboard
       requestBody:
         required: true
         content:
@@ -190,28 +173,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthSessionResponse"
         "400":
-          description: access_token ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Perfil não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
 
   /auth/forgot-password:
     post:
-      tags: [Auth]
+      tags:
+        - Auth
       summary: Solicita recuperação de senha
+      operationId: authForgotPassword
       requestBody:
         required: true
         content:
@@ -224,18 +197,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StatusOkResponse"
+                $ref: "#/components/schemas/OkStatusResponse"
         "400":
-          description: E-mail ausente ou falha na solicitação
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
 
   /auth/update-password:
     post:
-      tags: [Auth]
-      summary: Atualiza a senha a partir de access token do usuário
+      tags:
+        - Auth
+      summary: Atualiza senha usando access token válido do Supabase
+      operationId: authUpdatePassword
       requestBody:
         required: true
         content:
@@ -250,55 +221,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/UpdatePasswordResponse"
         "400":
-          description: Dados inválidos ou falha na atualização
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Token inválido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
 
   /auth/me:
     get:
-      tags: [Auth]
-      summary: Retorna a sessão ativa atual
+      tags:
+        - Auth
+      summary: Retorna os dados da sessão autenticada
+      operationId: authMe
       security:
         - bearerAuth: []
         - cookieAuth: []
       responses:
         "200":
-          description: Sessão válida
+          description: Sessão autenticada
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuthMeResponse"
         "401":
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
 
   /logout:
     post:
-      tags: [Auth]
-      summary: Encerra a sessão local
+      tags:
+        - Auth
+      summary: Encerra sessão local
+      operationId: logout
       responses:
         "200":
           description: Logout realizado
           headers:
             Set-Cookie:
-              description: Limpeza do cookie `token`
+              description: Cookie `token` limpo
               schema:
                 type: string
           content:
@@ -308,9 +267,10 @@ paths:
 
   /consent:
     post:
-      tags: [Chat]
-      summary: Cria sessão anônima para consentimento do chat
-      description: Gera uma sessão anônima e grava o cookie `token`.
+      tags:
+        - Chat
+      summary: Cria sessão anônima após aceite de consentimento
+      operationId: consent
       responses:
         "200":
           description: Consentimento aceito
@@ -326,11 +286,10 @@ paths:
 
   /send-message-n8n:
     post:
-      tags: [Chat]
-      summary: Envia mensagem para o webhook do n8n
-      description: |
-        Requer sessão ativa. O backend envia `{ identifier, message }` para o n8n,
-        onde `identifier` é o `sub` do usuário autenticado.
+      tags:
+        - Chat
+      summary: Envia mensagem para webhook do n8n
+      operationId: sendMessageN8n
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -342,446 +301,31 @@ paths:
               $ref: "#/components/schemas/SendMessageRequest"
       responses:
         "200":
-          description: Resposta devolvida pelo n8n
+          description: Resposta retornada pelo n8n
           content:
             application/json:
               schema:
                 type: object
                 additionalProperties: true
         "400":
-          description: Campo message ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Não autenticado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
         "502":
-          description: Falha ao chamar o n8n
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /agenda-doria:
-    post:
-      tags: [Agenda Doria]
-      summary: Cria um item da agenda Doria
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AgendaDoriaCreateRequest"
-      responses:
-        "201":
-          description: Item criado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgendaDoriaCreateResponse"
-        "400":
-          description: Dados inválidos
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao inserir na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    get:
-      tags: [Agenda Doria]
-      summary: Lista os itens da agenda Doria do usuário autenticado
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Lista retornada com sucesso
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgendaDoriaListResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao consultar a base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /agenda-doria/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdParam"
-    patch:
-      tags: [Agenda Doria]
-      summary: Atualiza parcialmente um item da agenda Doria
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AgendaDoriaUpdateRequest"
-      responses:
-        "200":
-          description: Item atualizado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgendaDoriaUpdateResponse"
-        "400":
-          description: Dados inválidos ou nenhum campo válido informado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Item ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao atualizar na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      tags: [Agenda Doria]
-      summary: Remove um item da agenda Doria
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Item removido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgendaDoriaDeleteResponse"
-        "400":
-          description: Parâmetro id inválido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Item ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao deletar da base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /registro-dor:
-    post:
-      tags: [Registro de Dor]
-      summary: Cria um registro de dor
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RegistroDorCreateRequest"
-      responses:
-        "201":
-          description: Registro criado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RegistroDorCreateResponse"
-        "400":
-          description: Dados inválidos
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao inserir na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    get:
-      tags: [Registro de Dor]
-      summary: Lista os registros de dor do usuário autenticado
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Lista retornada com sucesso
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RegistroDorListResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao consultar a base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /registro-dor/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdParam"
-    patch:
-      tags: [Registro de Dor]
-      summary: Atualiza parcialmente um registro de dor
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RegistroDorUpdateRequest"
-      responses:
-        "200":
-          description: Registro atualizado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RegistroDorUpdateResponse"
-        "400":
-          description: Dados inválidos ou nenhum campo válido informado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Item ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao atualizar na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      tags: [Registro de Dor]
-      summary: Remove um registro de dor
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Registro removido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RegistroDorDeleteResponse"
-        "400":
-          description: Parâmetro id inválido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Item ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao deletar da base
+          description: Falha no webhook do n8n
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
   /usuario:
-    get:
-      tags: [Usuário]
-      summary: Retorna o usuário autenticado
-      security:
-        - bearerAuth: []
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Usuário retornado com sucesso
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UsuarioGetResponse"
-        "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao consultar a base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    patch:
-      tags: [Usuário]
-      summary: Atualiza os dados do usuário autenticado
+    post:
+      tags:
+        - Usuário
+      summary: Cria ou atualiza o perfil do usuário autenticado
+      operationId: createUsuario
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -790,89 +334,133 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UsuarioUpdateRequest"
+              $ref: "#/components/schemas/UsuarioUpsertRequest"
       responses:
-        "200":
-          description: Usuário atualizado
+        "201":
+          description: Usuário criado/atualizado
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UsuarioUpdateResponse"
+                $ref: "#/components/schemas/UsuarioMutationResponse"
         "400":
-          description: Dados inválidos
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
         "500":
-          description: Erro ao atualizar na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      tags: [Usuário]
-      summary: Remove o usuário autenticado da tabela usuario
-      description: |
-        Remove apenas o registro da tabela `usuario`.
-        Não remove a conta em `auth.users` do Supabase.
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags:
+        - Usuário
+      summary: Retorna o perfil do usuário autenticado
+      operationId: getUsuario
       security:
         - bearerAuth: []
         - cookieAuth: []
       responses:
         "200":
-          description: Usuário removido
+          description: Perfil encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioSingleResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+        - Usuário
+      summary: Atualiza o perfil do usuário autenticado
+      operationId: updateUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsuarioUpsertRequest"
+      responses:
+        "200":
+          description: Perfil atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsuarioMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+        - Usuário
+      summary: Remove o usuário autenticado e dados relacionados
+      operationId: deleteUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Perfil removido
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UsuarioDeleteResponse"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
         "500":
-          description: Erro ao deletar da base
+          $ref: "#/components/responses/InternalServerError"
+
+  /usuario/por-auth_id/{auth_id}:
+    get:
+      tags:
+        - Usuário
+      summary: Busca usuário pelo auth_id da sessão
+      operationId: getUsuarioByAuthId
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AuthIdParam"
+      responses:
+        "200":
+          description: Usuário encontrado
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/UsuarioListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
 
-  /especialista-sbed:
+  /consultas:
     post:
-      tags: [Especialista SBED]
-      summary: Cria um especialista SBED vinculado ao usuário autenticado
+      tags:
+        - Consultas
+      summary: Cria consulta para o usuário autenticado
+      operationId: createConsulta
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -881,88 +469,830 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EspecialistaSbedCreateRequest"
+              $ref: "#/components/schemas/ConsultaCreateRequest"
+      responses:
+        "201":
+          description: Consulta criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags:
+        - Consultas
+      summary: Lista consultas do usuário autenticado
+      operationId: listConsultas
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de consultas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /consultas/{id}:
+    get:
+      tags:
+        - Consultas
+      summary: Busca consulta por ID
+      operationId: getConsultaById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Consulta encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Consultas
+      summary: Atualiza consulta por ID
+      operationId: updateConsulta
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsultaUpdateRequest"
+      responses:
+        "200":
+          description: Consulta atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+        - Consultas
+      summary: Remove consulta por ID
+      operationId: deleteConsulta
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Consulta removida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /consultas/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Consultas
+      summary: Lista consultas por id_usuario
+      operationId: listConsultasByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de consultas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /agenda-doria:
+    post:
+      tags:
+        - Agenda Doria
+      summary: Cria consulta pela rota compatível Agenda Doria
+      operationId: createAgendaDoria
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsultaCreateRequest"
+      responses:
+        "201":
+          description: Consulta criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags:
+        - Agenda Doria
+      summary: Lista consultas pela rota compatível Agenda Doria
+      operationId: listAgendaDoria
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de consultas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /agenda-doria/{id}:
+    get:
+      tags:
+        - Agenda Doria
+      summary: Busca consulta por ID pela rota Agenda Doria
+      operationId: getAgendaDoriaById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Consulta encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Agenda Doria
+      summary: Atualiza consulta por ID pela rota Agenda Doria
+      operationId: updateAgendaDoria
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsultaUpdateRequest"
+      responses:
+        "200":
+          description: Consulta atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Agenda Doria
+      summary: Remove consulta por ID pela rota Agenda Doria
+      operationId: deleteAgendaDoria
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Consulta removida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /agenda-doria/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Agenda Doria
+      summary: Lista consultas por id_usuario pela rota Agenda Doria
+      operationId: listAgendaDoriaByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de consultas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsultaListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /minha-jornada:
+    post:
+      tags:
+        - Minha Jornada
+      summary: Cria registro da jornada do usuário autenticado
+      operationId: createMinhaJornada
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JornadaCreateRequest"
+      responses:
+        "201":
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags:
+        - Minha Jornada
+      summary: Lista registros da jornada do usuário autenticado
+      operationId: listMinhaJornada
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de registros
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /minha-jornada/{id}:
+    get:
+      tags:
+        - Minha Jornada
+      summary: Busca registro da jornada por ID
+      operationId: getMinhaJornadaById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Registro encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Minha Jornada
+      summary: Atualiza registro da jornada por ID
+      operationId: updateMinhaJornada
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JornadaUpdateRequest"
+      responses:
+        "200":
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Minha Jornada
+      summary: Remove registro da jornada por ID
+      operationId: deleteMinhaJornada
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Registro removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /minha-jornada/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Minha Jornada
+      summary: Lista registros da jornada por id_usuario
+      operationId: listMinhaJornadaByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de registros
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /registro-dor:
+    post:
+      tags:
+        - Registro de Dor
+      summary: Cria registro de dor
+      operationId: createRegistroDor
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JornadaCreateRequest"
+      responses:
+        "201":
+          description: Registro criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    get:
+      tags:
+        - Registro de Dor
+      summary: Lista registros de dor
+      operationId: listRegistroDor
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de registros
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /registro-dor/{id}:
+    get:
+      tags:
+        - Registro de Dor
+      summary: Busca registro de dor por ID
+      operationId: getRegistroDorById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Registro encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Registro de Dor
+      summary: Atualiza registro de dor por ID
+      operationId: updateRegistroDor
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JornadaUpdateRequest"
+      responses:
+        "200":
+          description: Registro atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Registro de Dor
+      summary: Remove registro de dor por ID
+      operationId: deleteRegistroDor
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Registro removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /registro-dor/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Registro de Dor
+      summary: Lista registros de dor por id_usuario
+      operationId: listRegistroDorByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de registros
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JornadaListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /especialistas:
+    post:
+      tags:
+        - Especialistas
+      summary: Cria especialista vinculado ao usuário autenticado
+      operationId: createEspecialista
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EspecialistaCreateRequest"
       responses:
         "201":
           description: Especialista criado
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EspecialistaSbedCreateResponse"
+                $ref: "#/components/schemas/EspecialistaMutationResponse"
         "400":
-          description: Dados inválidos
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao inserir na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
     get:
-      tags: [Especialista SBED]
-      summary: Lista os especialistas SBED do usuário autenticado
+      tags:
+        - Especialistas
+      summary: Lista especialistas do usuário autenticado
+      operationId: listEspecialistas
       security:
         - bearerAuth: []
         - cookieAuth: []
       responses:
         "200":
-          description: Lista retornada com sucesso
+          description: Lista de especialistas
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EspecialistaSbedListResponse"
+                $ref: "#/components/schemas/EspecialistaListResponse"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao consultar a base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
 
-  /especialista-sbed/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdParam"
+  /especialistas/{id}:
+    get:
+      tags:
+        - Especialistas
+      summary: Busca especialista por ID
+      operationId: getEspecialistaById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Especialista encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
     patch:
-      tags: [Especialista SBED]
-      summary: Atualiza parcialmente um especialista SBED
+      tags:
+        - Especialistas
+      summary: Atualiza especialista por ID
+      operationId: updateEspecialista
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EspecialistaUpdateRequest"
+      responses:
+        "200":
+          description: Especialista atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Especialistas
+      summary: Remove especialista por ID
+      operationId: deleteEspecialista
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Especialista removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /especialistas/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Especialistas
+      summary: Lista especialistas por id_usuario
+      operationId: listEspecialistasByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de especialistas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /especialista-sbed:
+    post:
+      tags:
+        - Especialista SBED
+      summary: Cria especialista pela rota compatível Especialista SBED
+      operationId: createEspecialistaSbed
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -971,92 +1301,824 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EspecialistaSbedUpdateRequest"
+              $ref: "#/components/schemas/EspecialistaCreateRequest"
+      responses:
+        "201":
+          description: Especialista criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    get:
+      tags:
+        - Especialista SBED
+      summary: Lista especialistas pela rota compatível Especialista SBED
+      operationId: listEspecialistaSbed
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de especialistas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /especialista-sbed/{id}:
+    get:
+      tags:
+        - Especialista SBED
+      summary: Busca especialista por ID pela rota Especialista SBED
+      operationId: getEspecialistaSbedById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Especialista encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EspecialistaSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Especialista SBED
+      summary: Atualiza especialista por ID pela rota Especialista SBED
+      operationId: updateEspecialistaSbed
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EspecialistaUpdateRequest"
       responses:
         "200":
           description: Especialista atualizado
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EspecialistaSbedUpdateResponse"
+                $ref: "#/components/schemas/EspecialistaMutationResponse"
         "400":
-          description: Dados inválidos ou nenhum campo válido informado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
-          description: Especialista ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao atualizar na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
     delete:
-      tags: [Especialista SBED]
-      summary: Remove um especialista SBED
+      tags:
+        - Especialista SBED
+      summary: Remove especialista por ID pela rota Especialista SBED
+      operationId: deleteEspecialistaSbed
       security:
         - bearerAuth: []
         - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
       responses:
         "200":
           description: Especialista removido
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EspecialistaSbedDeleteResponse"
+                $ref: "#/components/schemas/EspecialistaDeleteResponse"
         "400":
-          description: Parâmetro id inválido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
-          description: Especialista ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
         "440":
-          description: Sessão expirada por inatividade
+          $ref: "#/components/responses/IdleTimeout"
+
+  /especialista-sbed/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Especialista SBED
+      summary: Lista especialistas por id_usuario pela rota Especialista SBED
+      operationId: listEspecialistaSbedByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de especialistas
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao deletar da base
+                $ref: "#/components/schemas/EspecialistaListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /clinicas:
+    post:
+      tags:
+        - Clínicas
+      summary: Cria clínica vinculada a especialista do usuário autenticado
+      operationId: createClinica
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicaCreateRequest"
+      responses:
+        "201":
+          description: Clínica criada
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ClinicaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    get:
+      tags:
+        - Clínicas
+      summary: Lista clínicas do usuário autenticado
+      operationId: listClinicas
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de clínicas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicaListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /clinicas/{id}:
+    get:
+      tags:
+        - Clínicas
+      summary: Busca clínica por ID
+      operationId: getClinicaById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Clínica encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicaSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Clínicas
+      summary: Atualiza clínica por ID
+      operationId: updateClinica
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClinicaUpdateRequest"
+      responses:
+        "200":
+          description: Clínica atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicaMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Clínicas
+      summary: Remove clínica por ID
+      operationId: deleteClinica
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Clínica removida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicaDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /clinicas/por-id_especialista/{id_especialista}:
+    get:
+      tags:
+        - Clínicas
+      summary: Lista clínicas por id_especialista
+      operationId: listClinicasByEspecialista
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdEspecialistaParam"
+      responses:
+        "200":
+          description: Lista de clínicas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicaListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /convenios:
+    post:
+      tags:
+        - Convênios
+      summary: Cria convênio vinculado a uma clínica
+      operationId: createConvenio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConvenioCreateRequest"
+      responses:
+        "201":
+          description: Convênio criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvenioMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    get:
+      tags:
+        - Convênios
+      summary: Lista convênios do usuário autenticado
+      operationId: listConvenios
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de convênios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvenioListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /convenios/{id}:
+    get:
+      tags:
+        - Convênios
+      summary: Busca convênio por ID
+      operationId: getConvenioById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Convênio encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvenioSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Convênios
+      summary: Atualiza convênio por ID
+      operationId: updateConvenio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConvenioUpdateRequest"
+      responses:
+        "200":
+          description: Convênio atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvenioMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Convênios
+      summary: Remove convênio por ID
+      operationId: deleteConvenio
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Convênio removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvenioDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /convenios/por-id_clinica/{id_clinica}:
+    get:
+      tags:
+        - Convênios
+      summary: Lista convênios por id_clinica
+      operationId: listConveniosByClinica
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdClinicaParam"
+      responses:
+        "200":
+          description: Lista de convênios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConvenioListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /enderecos:
+    post:
+      tags:
+        - Endereços
+      summary: Cria endereço para o usuário autenticado
+      operationId: createEndereco
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnderecoCreateRequest"
+      responses:
+        "201":
+          description: Endereço criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnderecoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    get:
+      tags:
+        - Endereços
+      summary: Lista endereços do usuário autenticado
+      operationId: listEnderecos
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de endereços
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnderecoListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /enderecos/{id}:
+    get:
+      tags:
+        - Endereços
+      summary: Busca endereço por ID
+      operationId: getEnderecoById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Endereço encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnderecoSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Endereços
+      summary: Atualiza endereço por ID
+      operationId: updateEndereco
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnderecoUpdateRequest"
+      responses:
+        "200":
+          description: Endereço atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnderecoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Endereços
+      summary: Remove endereço por ID
+      operationId: deleteEndereco
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Endereço removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnderecoDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /enderecos/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Endereços
+      summary: Lista endereços por id_usuario
+      operationId: listEnderecosByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de endereços
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnderecoListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /horario-atendimento:
+    post:
+      tags:
+        - Horário de Atendimento
+      summary: Cria horário de atendimento vinculado a uma clínica
+      operationId: createHorarioAtendimento
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HorarioAtendimentoCreateRequest"
+      responses:
+        "201":
+          description: Horário criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HorarioAtendimentoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    get:
+      tags:
+        - Horário de Atendimento
+      summary: Lista horários de atendimento do usuário autenticado
+      operationId: listHorariosAtendimento
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de horários
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HorarioAtendimentoListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /horario-atendimento/{id}:
+    get:
+      tags:
+        - Horário de Atendimento
+      summary: Busca horário de atendimento por ID
+      operationId: getHorarioAtendimentoById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Horário encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HorarioAtendimentoSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Horário de Atendimento
+      summary: Atualiza horário de atendimento por ID
+      operationId: updateHorarioAtendimento
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HorarioAtendimentoUpdateRequest"
+      responses:
+        "200":
+          description: Horário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HorarioAtendimentoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Horário de Atendimento
+      summary: Remove horário de atendimento por ID
+      operationId: deleteHorarioAtendimento
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Horário removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HorarioAtendimentoDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /horario-atendimento/por-id_clinica/{id_clinica}:
+    get:
+      tags:
+        - Horário de Atendimento
+      summary: Lista horários de atendimento por id_clinica
+      operationId: listHorariosAtendimentoByClinica
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdClinicaParam"
+      responses:
+        "200":
+          description: Lista de horários
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HorarioAtendimentoListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
 
   /medicacoes:
     post:
-      tags: [Medicações]
-      summary: Cria uma medicação
+      tags:
+        - Medicações
+      summary: Cria medicação para o usuário autenticado
+      operationId: createMedicacao
       security:
         - bearerAuth: []
         - cookieAuth: []
@@ -1072,84 +2134,71 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MedicacaoCreateResponse"
+                $ref: "#/components/schemas/MedicacaoMutationResponse"
         "400":
-          description: Dados inválidos
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao inserir na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
     get:
-      tags: [Medicações]
-      summary: Lista as medicações do usuário autenticado
+      tags:
+        - Medicações
+      summary: Lista medicações do usuário autenticado
+      operationId: listMedicacoes
       security:
         - bearerAuth: []
         - cookieAuth: []
       responses:
         "200":
-          description: Lista retornada com sucesso
+          description: Lista de medicações
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MedicacaoListResponse"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Usuário não encontrado na tabela usuario
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao consultar a base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
 
   /medicacoes/{id}:
-    parameters:
-      - $ref: "#/components/parameters/IdParam"
-    patch:
-      tags: [Medicações]
-      summary: Atualiza parcialmente uma medicação
+    get:
+      tags:
+        - Medicações
+      summary: Busca medicação por ID
+      operationId: getMedicacaoById
       security:
         - bearerAuth: []
         - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Medicação encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MedicacaoSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Medicações
+      summary: Atualiza medicação por ID
+      operationId: updateMedicacao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
       requestBody:
         required: true
         content:
@@ -1162,43 +2211,27 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MedicacaoUpdateResponse"
+                $ref: "#/components/schemas/MedicacaoMutationResponse"
         "400":
-          description: Dados inválidos ou nenhum campo válido informado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
-          description: Medicação ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
         "440":
-          description: Sessão expirada por inatividade
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao atualizar na base
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/IdleTimeout"
     delete:
-      tags: [Medicações]
-      summary: Remove uma medicação
+      tags:
+        - Medicações
+      summary: Remove medicação por ID
+      operationId: deleteMedicacao
       security:
         - bearerAuth: []
         - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
       responses:
         "200":
           description: Medicação removida
@@ -1207,155 +2240,351 @@ paths:
               schema:
                 $ref: "#/components/schemas/MedicacaoDeleteResponse"
         "400":
-          description: Parâmetro id inválido
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Sessão inválida ou ausente
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
-          description: Medicação ou usuário não encontrado
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+          $ref: "#/components/responses/NotFound"
         "440":
-          description: Sessão expirada por inatividade
+          $ref: "#/components/responses/IdleTimeout"
+
+  /medicacoes/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Medicações
+      summary: Lista medicações por id_usuario
+      operationId: listMedicacoesByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de medicações
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Erro ao deletar da base
+                $ref: "#/components/schemas/MedicacaoListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /controle-medicacoes:
+    post:
+      tags:
+        - Controle de Medicações
+      summary: Cria controle de medicação
+      operationId: createControleMedicacao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ControleMedicacaoCreateRequest"
+      responses:
+        "201":
+          description: Controle criado
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ControleMedicacaoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    get:
+      tags:
+        - Controle de Medicações
+      summary: Lista controles de medicação do usuário autenticado
+      operationId: listControleMedicacoes
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de controles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControleMedicacaoListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /controle-medicacoes/{id}:
+    get:
+      tags:
+        - Controle de Medicações
+      summary: Busca controle de medicação por ID
+      operationId: getControleMedicacaoById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Controle encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControleMedicacaoSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    patch:
+      tags:
+        - Controle de Medicações
+      summary: Atualiza controle de medicação por ID
+      operationId: updateControleMedicacao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ControleMedicacaoUpdateRequest"
+      responses:
+        "200":
+          description: Controle atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControleMedicacaoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+    delete:
+      tags:
+        - Controle de Medicações
+      summary: Remove controle de medicação por ID
+      operationId: deleteControleMedicacao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Controle removido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControleMedicacaoDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+
+  /controle-medicacoes/por-id_medicacoes/{id_medicacoes}:
+    get:
+      tags:
+        - Controle de Medicações
+      summary: Lista controles por id_medicacoes
+      operationId: listControleMedicacoesByMedicacao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdMedicacoesParam"
+      responses:
+        "200":
+          description: Lista de controles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ControleMedicacaoListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
 
 components:
-  parameters:
-    IdParam:
-      name: id
-      in: path
-      required: true
-      description: Identificador numérico do recurso
-      schema:
-        type: integer
-        minimum: 1
-
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT retornado pelo endpoint `/login`
     cookieAuth:
       type: apiKey
       in: cookie
       name: token
-      description: Cookie de sessão local criado pelo backend
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      description: UUID do recurso.
+      schema:
+        type: string
+        format: uuid
+
+    AuthIdParam:
+      name: auth_id
+      in: path
+      required: true
+      description: UUID do usuário no Supabase Auth.
+      schema:
+        type: string
+        format: uuid
+
+    IdUsuarioParam:
+      name: id_usuario
+      in: path
+      required: true
+      description: UUID do usuário.
+      schema:
+        type: string
+        format: uuid
+
+    IdEspecialistaParam:
+      name: id_especialista
+      in: path
+      required: true
+      description: UUID do especialista.
+      schema:
+        type: string
+        format: uuid
+
+    IdClinicaParam:
+      name: id_clinica
+      in: path
+      required: true
+      description: UUID da clínica.
+      schema:
+        type: string
+        format: uuid
+
+    IdMedicacoesParam:
+      name: id_medicacoes
+      in: path
+      required: true
+      description: UUID da medicação.
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Unauthorized:
+      description: Não autenticado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Forbidden:
+      description: Sem permissão para acessar o recurso
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    IdleTimeout:
+      description: Sessão expirada por inatividade
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalServerError:
+      description: Erro interno
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 
   schemas:
     ErrorResponse:
       type: object
-      additionalProperties: false
-      required: [Error]
       properties:
         Error:
           type: string
-          example: you are not authenticated
+      required:
+        - Error
+      additionalProperties: true
+
+    OkStatusResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: ok
+      required:
+        - Status
 
     HealthResponse:
       type: object
-      additionalProperties: false
-      required: [Status, hasSession]
       properties:
         Status:
           type: string
           example: Success
         hasSession:
           type: boolean
-
-    StatusOkResponse:
-      type: object
-      additionalProperties: false
-      required: [Status]
-      properties:
-        Status:
-          type: string
-          example: ok
-
-    LogoutResponse:
-      type: object
-      additionalProperties: false
-      required: [Status]
-      properties:
-        Status:
-          type: string
-          example: Logged out
-
-    ConsentResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, created]
-      properties:
-        Status:
-          type: string
-          example: Consent accepted
-        created:
-          type: boolean
-          example: true
-
-    AccessTokenRequest:
-      type: object
-      additionalProperties: false
-      required: [access_token]
-      properties:
-        access_token:
-          type: string
-          minLength: 1
-
-    ForgotPasswordRequest:
-      type: object
-      additionalProperties: false
-      required: [email]
-      properties:
-        email:
-          type: string
-          format: email
-
-    UpdatePasswordRequest:
-      type: object
-      additionalProperties: false
-      required: [access_token, newPassword]
-      properties:
-        access_token:
-          type: string
-        newPassword:
-          type: string
-          minLength: 1
-
-    UpdatePasswordResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, updated]
-      properties:
-        Status:
-          type: string
-          example: ok
-        updated:
-          type: boolean
-          example: true
+      required:
+        - Status
+        - hasSession
 
     AuthSignupRequest:
       type: object
-      additionalProperties: false
-      required: [email, password]
       properties:
         email:
           type: string
@@ -1367,105 +2596,179 @@ components:
           type: string
         tipo:
           type: string
-          example: paciente
+          default: paciente
         cpf:
           type: string
+      required:
+        - email
+        - password
+      additionalProperties: true
 
     AuthSignupResponse:
       type: object
-      additionalProperties: false
-      required: [Status, auth_id, email, needs_email_confirm]
       properties:
         Status:
           type: string
           example: created
         auth_id:
           type: string
+          format: uuid
         email:
           type: string
           format: email
         needs_email_confirm:
           type: boolean
+      required:
+        - Status
+        - auth_id
+        - email
+        - needs_email_confirm
 
     LoginRequest:
       type: object
-      additionalProperties: false
-      required: [email, password]
       properties:
         email:
           type: string
           format: email
         password:
           type: string
-
-    UsuarioResumo:
-      type: object
-      additionalProperties: false
-      required: [email]
-      properties:
-        auth_id:
-          type: string
-        nome:
-          type: string
-          nullable: true
-        email:
-          type: string
-          format: email
-        tipo:
-          type: string
-          nullable: true
-        cpf:
-          type: string
-          nullable: true
+      required:
+        - email
+        - password
 
     LoginResponse:
       type: object
-      additionalProperties: false
-      required: [Status, token, user]
       properties:
         Status:
           type: string
           example: success
         token:
           type: string
-          description: JWT de sessão local do backend
         user:
           type: object
-          additionalProperties: false
-          required: [nome, email, tipo]
           properties:
             nome:
-              type: string
-              nullable: true
+              type:
+                - string
+                - "null"
             email:
               type: string
               format: email
             tipo:
               type: string
-              nullable: true
+          required:
+            - email
+            - tipo
+      required:
+        - Status
+        - token
+        - user
+
+    AccessTokenRequest:
+      type: object
+      properties:
+        access_token:
+          type: string
+      required:
+        - access_token
 
     AuthSessionResponse:
       type: object
-      additionalProperties: false
-      required: [Status, user]
       properties:
         Status:
           type: string
           example: success
         user:
-          $ref: "#/components/schemas/UsuarioResumo"
+          $ref: "#/components/schemas/AuthUsuarioProfile"
+      required:
+        - Status
+        - user
+
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+        - email
+
+    UpdatePasswordRequest:
+      type: object
+      properties:
+        access_token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+      required:
+        - access_token
+        - newPassword
+
+    UpdatePasswordResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: ok
+        updated:
+          type: boolean
+          example: true
+      required:
+        - Status
+        - updated
+
+    AuthMeResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: ok
+        user:
+          $ref: "#/components/schemas/JwtSessionPayload"
+      required:
+        - Status
+        - user
+
+    LogoutResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: Logged out
+      required:
+        - Status
+
+    ConsentResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: Consent accepted
+        created:
+          type: boolean
+          example: true
+      required:
+        - Status
+        - created
+
+    SendMessageRequest:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
 
     JwtSessionPayload:
       type: object
-      additionalProperties: false
-      required: [sub, last, anon]
       properties:
         sub:
           type: string
-          description: auth_id do usuário ou UUID anônimo
+          format: uuid
         last:
           type: integer
-          description: timestamp em milissegundos da última atividade
+          format: int64
         anon:
           type: boolean
         doctorId:
@@ -1479,690 +2782,1313 @@ components:
           type: string
         cpf:
           type: string
+      required:
+        - sub
+        - last
+        - anon
+      additionalProperties: true
 
-    AuthMeResponse:
+    AuthUsuarioProfile:
       type: object
-      additionalProperties: false
-      required: [Status, user]
       properties:
-        Status:
+        id_usuario:
           type: string
-          example: ok
-        user:
-          $ref: "#/components/schemas/JwtSessionPayload"
-
-    SendMessageRequest:
-      type: object
-      additionalProperties: false
-      required: [message]
-      properties:
-        message:
+          format: uuid
+        auth_id:
           type: string
-          minLength: 1
+          format: uuid
+        email:
+          type: string
+          format: email
+        nome:
+          type:
+            - string
+            - "null"
+        tipo:
+          type: string
+        cpf:
+          type:
+            - string
+            - "null"
+      required:
+        - id_usuario
+        - auth_id
+        - email
+        - tipo
 
     Usuario:
       type: object
-      additionalProperties: false
-      required:
-        - uuid
-        - auth_id
-        - nome
-        - cpf
-        - created_at
-        - email
-        - tipo
-        - data_nascimento
-        - telefone_pessoal
-        - cep_pessoal
-        - rua_pessoal
-        - cidade_pessoal
-        - estado_pessoal
-        - bairro_pessoal
-        - complemento_pessoal
-        - numero_endereco_pessoal
       properties:
-        uuid:
+        id_usuario:
           type: string
+          format: uuid
         auth_id:
           type: string
+          format: uuid
+        nome:
+          type:
+            - string
+            - "null"
+        cpf:
+          type:
+            - string
+            - "null"
+        created_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+        email:
+          type:
+            - string
+            - "null"
+          format: email
+        tipo_usuario:
+          type:
+            - string
+            - "null"
+        data_nascimento:
+          type:
+            - string
+            - "null"
+          format: date
+        telefone_pessoal:
+          type:
+            - string
+            - "null"
+        sexo_biologico:
+          type:
+            - integer
+            - "null"
+        area_de_atuacao:
+          type:
+            - string
+            - "null"
+      required:
+        - id_usuario
+        - auth_id
+
+    UsuarioUpsertRequest:
+      type: object
+      description: |
+        Campos protegidos e recusados: `id_usuario`, `uuid`, `auth_id`, `created_at`.
+        Alias aceitos:
+        - `tipo` para `tipo_usuario`
+        - `sexo` para `sexo_biologico`
+        - `Área de Atuação` para `area_de_atuacao`
+      properties:
         nome:
           type: string
-          nullable: true
         cpf:
           type: string
-          nullable: true
-          pattern: '^[0-9]{11}$'
-        created_at:
-          type: string
-          format: date-time
-          nullable: true
+          pattern: "^\\d{11}$"
         email:
           type: string
-          nullable: true
+          format: email
+        tipo_usuario:
+          type: string
         tipo:
           type: string
-          nullable: true
         data_nascimento:
           type: string
           format: date
-          nullable: true
         telefone_pessoal:
           type: string
-          nullable: true
-        cep_pessoal:
+        sexo_biologico:
+          type: integer
+        sexo:
+          type: integer
+        area_de_atuacao:
           type: string
-          nullable: true
-        rua_pessoal:
+        Área de Atuação:
           type: string
-          nullable: true
-        cidade_pessoal:
-          type: string
-          nullable: true
-        estado_pessoal:
-          type: string
-          nullable: true
-        bairro_pessoal:
-          type: string
-          nullable: true
-        complemento_pessoal:
-          type: string
-          nullable: true
-        numero_endereco_pessoal:
-          type: string
-          nullable: true
+      additionalProperties: true
 
-    UsuarioGetResponse:
+    UsuarioSingleResponse:
       type: object
-      additionalProperties: false
-      required: [Status, usuario]
       properties:
         Status:
           type: string
           example: success
         usuario:
           $ref: "#/components/schemas/Usuario"
+      required:
+        - Status
+        - usuario
 
-    UsuarioUpdateRequest:
+    UsuarioMutationResponse:
       type: object
-      additionalProperties: false
-      properties:
-        nome:
-          type: string
-        cpf:
-          type: string
-          pattern: '^[0-9]{11}$'
-        email:
-          type: string
-        tipo:
-          type: string
-        data_nascimento:
-          type: string
-          format: date
-        telefone_pessoal:
-          type: string
-        cep_pessoal:
-          type: string
-        rua_pessoal:
-          type: string
-        cidade_pessoal:
-          type: string
-        estado_pessoal:
-          type: string
-        bairro_pessoal:
-          type: string
-        complemento_pessoal:
-          type: string
-        numero_endereco_pessoal:
-          type: string
-      description: |
-        Envie um ou mais campos do perfil.
-        Os campos `uuid`, `auth_id` e `created_at` não são permitidos.
-
-    UsuarioUpdateResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, usuario]
       properties:
         Status:
           type: string
-          example: updated
+          enum:
+            - created
+            - updated
         usuario:
           $ref: "#/components/schemas/Usuario"
+      required:
+        - Status
+        - usuario
 
     UsuarioDeleteResponse:
       type: object
-      additionalProperties: false
-      required: [Status, usuario]
       properties:
         Status:
           type: string
           example: deleted
         usuario:
           $ref: "#/components/schemas/Usuario"
-
-    AgendaDoria:
-      type: object
-      additionalProperties: false
-      required: [id, uuid, nome, data, horario]
-      properties:
-        id:
-          type: integer
-          minimum: 1
-        uuid:
-          type: string
-        nome:
-          type: string
-          nullable: true
-        data:
-          type: string
-          format: date
-          nullable: true
-        horario:
-          type: string
-          nullable: true
-          example: 14:30
-
-    AgendaDoriaCreateRequest:
-      type: object
-      additionalProperties: false
-      required: [nome, data, horario]
-      properties:
-        nome:
-          type: string
-          minLength: 1
-        data:
-          type: string
-          format: date
-        horario:
-          type: string
-          minLength: 1
-
-    AgendaDoriaUpdateRequest:
-      type: object
-      additionalProperties: false
-      properties:
-        nome:
-          type: string
-        data:
-          type: string
-          format: date
-        horario:
-          type: string
-      description: Envie ao menos um dos campos acima. O campo `uuid` não é permitido.
-
-    AgendaDoriaCreateResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, agenda_doria]
-      properties:
-        Status:
-          type: string
-          example: created
-        agenda_doria:
-          $ref: "#/components/schemas/AgendaDoria"
-
-    AgendaDoriaUpdateResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, agenda_doria]
-      properties:
-        Status:
-          type: string
-          example: updated
-        agenda_doria:
-          $ref: "#/components/schemas/AgendaDoria"
-
-    AgendaDoriaDeleteResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, agenda_doria]
-      properties:
-        Status:
-          type: string
-          example: deleted
-        agenda_doria:
-          $ref: "#/components/schemas/AgendaDoria"
-
-    AgendaDoriaListResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, total, agenda_doria]
-      properties:
-        Status:
-          type: string
-          example: success
-        total:
-          type: integer
-          minimum: 0
-        agenda_doria:
-          type: array
-          items:
-            $ref: "#/components/schemas/AgendaDoria"
-
-    RegistroDor:
-      type: object
-      additionalProperties: false
-      required: [id, uuid, dia, registro, nivel_de_dor]
-      properties:
-        id:
-          type: integer
-          minimum: 1
-        uuid:
-          type: string
-        dia:
-          type: string
-          format: date
-        registro:
-          type: string
-        nivel_de_dor:
-          type: integer
-
-    RegistroDorCreateRequest:
-      type: object
-      additionalProperties: false
-      required: [dia, registro, nivel_de_dor]
-      properties:
-        dia:
-          type: string
-          format: date
-        registro:
-          type: string
-          minLength: 1
-        nivel_de_dor:
-          type: integer
-
-    RegistroDorUpdateRequest:
-      type: object
-      additionalProperties: false
-      properties:
-        dia:
-          type: string
-          format: date
-        registro:
-          type: string
-        nivel_de_dor:
-          type: integer
-      description: Envie ao menos um dos campos acima. O campo `uuid` não é permitido.
-
-    RegistroDorCreateResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, registro_dor]
-      properties:
-        Status:
-          type: string
-          example: created
-        registro_dor:
-          $ref: "#/components/schemas/RegistroDor"
-
-    RegistroDorUpdateResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, registro_dor]
-      properties:
-        Status:
-          type: string
-          example: updated
-        registro_dor:
-          $ref: "#/components/schemas/RegistroDor"
-
-    RegistroDorDeleteResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, registro_dor]
-      properties:
-        Status:
-          type: string
-          example: deleted
-        registro_dor:
-          $ref: "#/components/schemas/RegistroDor"
-
-    RegistroDorListResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, total, registro_dor]
-      properties:
-        Status:
-          type: string
-          example: success
-        total:
-          type: integer
-          minimum: 0
-        registro_dor:
-          type: array
-          items:
-            $ref: "#/components/schemas/RegistroDor"
-
-    EspecialistaSbed:
-      type: object
-      additionalProperties: false
       required:
-        - id
-        - nome
-        - clinica
-        - estado
-        - telefone_de_contato
-        - email_profissional
-        - horario_atendimento
-        - site
-        - especialidade
-        - cidade
-        - rua
-        - cep
-        - atendimento
-        - sugerido
-        - email_de_contato
-        - usuario_id
-        - complemento
-        - numero
-        - bairro
-      properties:
-        id:
-          type: integer
-          minimum: 1
-        nome:
-          type: string
-          nullable: true
-        clinica:
-          type: string
-          nullable: true
-        estado:
-          type: string
-          nullable: true
-        telefone_de_contato:
-          type: string
-          nullable: true
-        email_profissional:
-          type: string
-          nullable: true
-        horario_atendimento:
-          type: string
-          nullable: true
-        site:
-          type: string
-          nullable: true
-        especialidade:
-          type: string
-          nullable: true
-        cidade:
-          type: string
-          nullable: true
-        rua:
-          type: string
-          nullable: true
-        cep:
-          type: string
-          nullable: true
-        atendimento:
-          type: string
-          nullable: true
-        sugerido:
-          type: integer
-          nullable: true
-        email_de_contato:
-          type: string
-          nullable: true
-        usuario_id:
-          type: string
-          nullable: true
-        complemento:
-          type: string
-          nullable: true
-        numero:
-          type: string
-          nullable: true
-        bairro:
-          type: string
-          nullable: true
+        - Status
+        - usuario
 
-    EspecialistaSbedCreateRequest:
+    UsuarioListResponse:
       type: object
-      additionalProperties: false
-      required: [nome]
-      properties:
-        nome:
-          type: string
-          minLength: 1
-        clinica:
-          type: string
-        estado:
-          type: string
-        telefone_de_contato:
-          type: string
-        email_profissional:
-          type: string
-        horario_atendimento:
-          type: string
-        site:
-          type: string
-        especialidade:
-          type: string
-        cidade:
-          type: string
-        rua:
-          type: string
-        cep:
-          type: string
-        atendimento:
-          type: string
-        sugerido:
-          type: integer
-        email_de_contato:
-          type: string
-        complemento:
-          type: string
-        numero:
-          type: string
-        bairro:
-          type: string
-      description: Os campos `id` e `usuario_id` não são permitidos nesta rota.
-
-    EspecialistaSbedUpdateRequest:
-      type: object
-      additionalProperties: false
-      properties:
-        nome:
-          type: string
-        clinica:
-          type: string
-        estado:
-          type: string
-        telefone_de_contato:
-          type: string
-        email_profissional:
-          type: string
-        horario_atendimento:
-          type: string
-        site:
-          type: string
-        especialidade:
-          type: string
-        cidade:
-          type: string
-        rua:
-          type: string
-        cep:
-          type: string
-        atendimento:
-          type: string
-        sugerido:
-          type: integer
-        email_de_contato:
-          type: string
-        complemento:
-          type: string
-        numero:
-          type: string
-        bairro:
-          type: string
-      description: Envie ao menos um dos campos acima. O campo `usuario_id` não é permitido.
-
-    EspecialistaSbedCreateResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, especialista_sbed]
-      properties:
-        Status:
-          type: string
-          example: created
-        especialista_sbed:
-          $ref: "#/components/schemas/EspecialistaSbed"
-
-    EspecialistaSbedUpdateResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, especialista_sbed]
-      properties:
-        Status:
-          type: string
-          example: updated
-        especialista_sbed:
-          $ref: "#/components/schemas/EspecialistaSbed"
-
-    EspecialistaSbedDeleteResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, especialista_sbed]
-      properties:
-        Status:
-          type: string
-          example: deleted
-        especialista_sbed:
-          $ref: "#/components/schemas/EspecialistaSbed"
-
-    EspecialistaSbedListResponse:
-      type: object
-      additionalProperties: false
-      required: [Status, total, especialista_sbed]
       properties:
         Status:
           type: string
           example: success
         total:
           type: integer
-          minimum: 0
-        especialista_sbed:
+          example: 1
+        usuarios:
           type: array
           items:
-            $ref: "#/components/schemas/EspecialistaSbed"
+            $ref: "#/components/schemas/Usuario"
+      required:
+        - Status
+        - total
+        - usuarios
+
+    Consulta:
+      type: object
+      properties:
+        id_consulta:
+          type: string
+          format: uuid
+        id_usuario:
+          type: string
+          format: uuid
+        medico:
+          type:
+            - string
+            - "null"
+        data_hora:
+          type:
+            - string
+            - "null"
+          format: date-time
+        notificacao:
+          type:
+            - string
+            - "null"
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+      required:
+        - id_consulta
+        - id_usuario
+
+    ConsultaCreateRequest:
+      type: object
+      properties:
+        medico:
+          type: string
+        data_hora:
+          type: string
+          format: date-time
+        notificacao:
+          type: string
+      required:
+        - medico
+        - data_hora
+
+    ConsultaUpdateRequest:
+      type: object
+      properties:
+        medico:
+          type: string
+        data_hora:
+          type: string
+          format: date-time
+        notificacao:
+          type: string
+      minProperties: 1
+
+    ConsultaSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        consulta:
+          $ref: "#/components/schemas/Consulta"
+      required:
+        - Status
+        - consulta
+
+    ConsultaMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        consulta:
+          $ref: "#/components/schemas/Consulta"
+      required:
+        - Status
+        - consulta
+
+    ConsultaDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        consulta:
+          $ref: "#/components/schemas/Consulta"
+      required:
+        - Status
+        - consulta
+
+    ConsultaListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        consultas:
+          type: array
+          items:
+            $ref: "#/components/schemas/Consulta"
+      required:
+        - Status
+        - total
+        - consultas
+
+    Jornada:
+      type: object
+      properties:
+        id_registro:
+          type: string
+          format: uuid
+        id_usuario:
+          type: string
+          format: uuid
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+        nivel_dor:
+          type:
+            - integer
+            - "null"
+        qualidade_sono:
+          type:
+            - integer
+            - "null"
+        nivel_emocional:
+          type:
+            - integer
+            - "null"
+        descricao:
+          type:
+            - string
+            - "null"
+      required:
+        - id_registro
+        - id_usuario
+
+    JornadaCreateRequest:
+      type: object
+      description: |
+        Alias aceitos:
+        - `registro` para `descricao`
+        - `nivel_de_dor` para `nivel_dor`
+        - `nivel_sono` para `qualidade_sono`
+        - `nivel_ansiedade` para `nivel_emocional`
+      properties:
+        nivel_dor:
+          type: integer
+        nivel_de_dor:
+          type: integer
+        qualidade_sono:
+          type: integer
+        nivel_sono:
+          type: integer
+        nivel_emocional:
+          type: integer
+        nivel_ansiedade:
+          type: integer
+        descricao:
+          type: string
+        registro:
+          type: string
+      additionalProperties: true
+
+    JornadaUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/JornadaCreateRequest"
+      minProperties: 1
+
+    JornadaSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        registro:
+          $ref: "#/components/schemas/Jornada"
+      required:
+        - Status
+        - registro
+
+    JornadaMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        registro:
+          $ref: "#/components/schemas/Jornada"
+      required:
+        - Status
+        - registro
+
+    JornadaDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        registro:
+          $ref: "#/components/schemas/Jornada"
+      required:
+        - Status
+        - registro
+
+    JornadaListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        registros:
+          type: array
+          items:
+            $ref: "#/components/schemas/Jornada"
+      required:
+        - Status
+        - total
+        - registros
+
+    Especialista:
+      type: object
+      properties:
+        id_especialista:
+          type: string
+          format: uuid
+        id_usuário:
+          type: string
+          format: uuid
+        profissao:
+          type:
+            - string
+            - "null"
+        conselho:
+          type:
+            - string
+            - "null"
+        estado_conselho:
+          type:
+            - string
+            - "null"
+        num_registro_conselho:
+          type:
+            - string
+            - "null"
+        especialidade:
+          type:
+            - string
+            - "null"
+        registro_rqe:
+          type:
+            - string
+            - "null"
+        curriculo:
+          type:
+            - string
+            - "null"
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+        termo_aceito:
+          type:
+            - boolean
+            - "null"
+      required:
+        - id_especialista
+        - id_usuário
+
+    EspecialistaCreateRequest:
+      type: object
+      description: |
+        O dono é resolvido pela sessão. Campos protegidos: `id_especialista`, `id_usuario`, `usuario_id`, `criado_em`, `created_at`.
+      properties:
+        profissao:
+          type: string
+        conselho:
+          type: string
+        estado_conselho:
+          type: string
+        num_registro_conselho:
+          type: string
+        especialidade:
+          type: string
+        registro_rqe:
+          type: string
+        curriculo:
+          type: string
+        termo_aceito:
+          type: boolean
+
+    EspecialistaUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/EspecialistaCreateRequest"
+      minProperties: 1
+
+    EspecialistaSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        especialista:
+          $ref: "#/components/schemas/Especialista"
+      required:
+        - Status
+        - especialista
+
+    EspecialistaMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        especialista:
+          $ref: "#/components/schemas/Especialista"
+      required:
+        - Status
+        - especialista
+
+    EspecialistaDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        especialista:
+          $ref: "#/components/schemas/Especialista"
+      required:
+        - Status
+        - especialista
+
+    EspecialistaListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        especialistas:
+          type: array
+          items:
+            $ref: "#/components/schemas/Especialista"
+      required:
+        - Status
+        - total
+        - especialistas
+
+    Clinica:
+      type: object
+      properties:
+        id_clinica:
+          type: string
+          format: uuid
+        id_especialista:
+          type: string
+          format: uuid
+        nome:
+          type:
+            - string
+            - "null"
+        whatsapp:
+          type:
+            - string
+            - "null"
+        email:
+          type:
+            - string
+            - "null"
+          format: email
+        tipo_atendimento:
+          type:
+            - string
+            - "null"
+        site:
+          type:
+            - string
+            - "null"
+        instagram:
+          type:
+            - string
+            - "null"
+        facebook:
+          type:
+            - string
+            - "null"
+        linkedin:
+          type:
+            - string
+            - "null"
+        cep:
+          type:
+            - string
+            - "null"
+        rua:
+          type:
+            - string
+            - "null"
+        cidade:
+          type:
+            - string
+            - "null"
+        estado:
+          type:
+            - string
+            - "null"
+        complemento:
+          type:
+            - string
+            - "null"
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+        numer:
+          type:
+            - string
+            - "null"
+        bairro:
+          type:
+            - string
+            - "null"
+        tipo_consulta:
+          type:
+            - string
+            - "null"
+      required:
+        - id_clinica
+        - id_especialista
+
+    ClinicaCreateRequest:
+      type: object
+      description: |
+        Alias aceito: `numero` para `numer`.
+      properties:
+        id_especialista:
+          type: string
+          format: uuid
+        nome:
+          type: string
+        whatsapp:
+          type: string
+        email:
+          type: string
+          format: email
+        tipo_atendimento:
+          type: string
+        site:
+          type: string
+        instagram:
+          type: string
+        facebook:
+          type: string
+        linkedin:
+          type: string
+        cep:
+          type: string
+        rua:
+          type: string
+        cidade:
+          type: string
+        estado:
+          type: string
+        complemento:
+          type: string
+        numer:
+          type: string
+        numero:
+          type: string
+        bairro:
+          type: string
+        tipo_consulta:
+          type: string
+      required:
+        - id_especialista
+      additionalProperties: true
+
+    ClinicaUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/ClinicaCreateRequest"
+      minProperties: 1
+
+    ClinicaSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        clinica:
+          $ref: "#/components/schemas/Clinica"
+      required:
+        - Status
+        - clinica
+
+    ClinicaMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        clinica:
+          $ref: "#/components/schemas/Clinica"
+      required:
+        - Status
+        - clinica
+
+    ClinicaDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        clinica:
+          $ref: "#/components/schemas/Clinica"
+      required:
+        - Status
+        - clinica
+
+    ClinicaListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        clinicas:
+          type: array
+          items:
+            $ref: "#/components/schemas/Clinica"
+      required:
+        - Status
+        - total
+        - clinicas
+
+    Convenio:
+      type: object
+      properties:
+        id_convenio:
+          type: string
+          format: uuid
+        id_clinica:
+          type: string
+          format: uuid
+        nome_convenio:
+          type:
+            - string
+            - "null"
+        descrição:
+          type:
+            - string
+            - "null"
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+      required:
+        - id_convenio
+        - id_clinica
+
+    ConvenioCreateRequest:
+      type: object
+      description: |
+        Alias aceito: `descricao` para `descrição`.
+      properties:
+        id_clinica:
+          type: string
+          format: uuid
+        nome_convenio:
+          type: string
+        descrição:
+          type: string
+        descricao:
+          type: string
+      required:
+        - id_clinica
+      additionalProperties: true
+
+    ConvenioUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/ConvenioCreateRequest"
+      minProperties: 1
+
+    ConvenioSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        convenio:
+          $ref: "#/components/schemas/Convenio"
+      required:
+        - Status
+        - convenio
+
+    ConvenioMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        convenio:
+          $ref: "#/components/schemas/Convenio"
+      required:
+        - Status
+        - convenio
+
+    ConvenioDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        convenio:
+          $ref: "#/components/schemas/Convenio"
+      required:
+        - Status
+        - convenio
+
+    ConvenioListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        convenios:
+          type: array
+          items:
+            $ref: "#/components/schemas/Convenio"
+      required:
+        - Status
+        - total
+        - convenios
+
+    Endereco:
+      type: object
+      properties:
+        id_enderecos:
+          type: string
+          format: uuid
+        id_usuario:
+          type: string
+          format: uuid
+        rua:
+          type:
+            - string
+            - "null"
+        cep:
+          type:
+            - string
+            - "null"
+        complemento:
+          type:
+            - string
+            - "null"
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+        bairro:
+          type:
+            - string
+            - "null"
+        cidade:
+          type:
+            - string
+            - "null"
+        estado:
+          type:
+            - string
+            - "null"
+        numero:
+          type:
+            - string
+            - "null"
+      required:
+        - id_enderecos
+        - id_usuario
+
+    EnderecoCreateRequest:
+      type: object
+      properties:
+        rua:
+          type: string
+        cep:
+          type: string
+        complemento:
+          type: string
+        bairro:
+          type: string
+        cidade:
+          type: string
+        estado:
+          type: string
+        numero:
+          type: string
+
+    EnderecoUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/EnderecoCreateRequest"
+      minProperties: 1
+
+    EnderecoSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        endereco:
+          $ref: "#/components/schemas/Endereco"
+      required:
+        - Status
+        - endereco
+
+    EnderecoMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        endereco:
+          $ref: "#/components/schemas/Endereco"
+      required:
+        - Status
+        - endereco
+
+    EnderecoDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        endereco:
+          $ref: "#/components/schemas/Endereco"
+      required:
+        - Status
+        - endereco
+
+    EnderecoListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        enderecos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Endereco"
+      required:
+        - Status
+        - total
+        - enderecos
+
+    HorarioAtendimento:
+      type: object
+      properties:
+        id_atendimento:
+          type: string
+          format: uuid
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+        id_clinica:
+          type: string
+          format: uuid
+        dia:
+          type:
+            - string
+            - "null"
+        comeco:
+          type:
+            - string
+            - "null"
+          pattern: "^\\d{2}:\\d{2}(:\\d{2})?$"
+        fim:
+          type:
+            - string
+            - "null"
+          pattern: "^\\d{2}:\\d{2}(:\\d{2})?$"
+      required:
+        - id_atendimento
+        - id_clinica
+
+    HorarioAtendimentoCreateRequest:
+      type: object
+      properties:
+        id_clinica:
+          type: string
+          format: uuid
+        dia:
+          type: string
+        comeco:
+          type: string
+          pattern: "^\\d{2}:\\d{2}(:\\d{2})?$"
+          example: "08:00"
+        fim:
+          type: string
+          pattern: "^\\d{2}:\\d{2}(:\\d{2})?$"
+          example: "18:00"
+      required:
+        - id_clinica
+
+    HorarioAtendimentoUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/HorarioAtendimentoCreateRequest"
+      minProperties: 1
+
+    HorarioAtendimentoSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        horario_atendimento:
+          $ref: "#/components/schemas/HorarioAtendimento"
+      required:
+        - Status
+        - horario_atendimento
+
+    HorarioAtendimentoMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        horario_atendimento:
+          $ref: "#/components/schemas/HorarioAtendimento"
+      required:
+        - Status
+        - horario_atendimento
+
+    HorarioAtendimentoDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        horario_atendimento:
+          $ref: "#/components/schemas/HorarioAtendimento"
+      required:
+        - Status
+        - horario_atendimento
+
+    HorarioAtendimentoListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        horarios_atendimento:
+          type: array
+          items:
+            $ref: "#/components/schemas/HorarioAtendimento"
+      required:
+        - Status
+        - total
+        - horarios_atendimento
 
     Medicacao:
       type: object
-      additionalProperties: false
-      required: [id, uuid, nome, frequencia, inicio, fim, tipo, tomou]
       properties:
-        id:
-          type: integer
-          minimum: 1
-        uuid:
+        id_medicacoes:
           type: string
+          format: uuid
+        id_usuario:
+          type: string
+          format: uuid
         nome:
-          type: string
-          nullable: true
+          type:
+            - string
+            - "null"
         frequencia:
-          type: string
-          nullable: true
-        inicio:
-          type: string
+          type:
+            - string
+            - "null"
+        continuo:
+          type:
+            - boolean
+            - "null"
+        periodo_inicio:
+          type:
+            - string
+            - "null"
+          format: date
+        periodo_fim:
+          type:
+            - string
+            - "null"
+          format: date
+        horarios:
+          type:
+            - string
+            - "null"
+        notificacao_alerta:
+          type:
+            - string
+            - "null"
+        criado_em:
+          type:
+            - string
+            - "null"
           format: date-time
-          nullable: true
-        fim:
-          type: string
-          format: date-time
-          nullable: true
-        tipo:
-          type: integer
-          nullable: true
-        tomou:
-          type: integer
-          nullable: true
+      required:
+        - id_medicacoes
+        - id_usuario
 
     MedicacaoCreateRequest:
       type: object
-      additionalProperties: false
-      required: [nome]
+      description: |
+        Alias aceitos:
+        - `inicio` para `periodo_inicio`
+        - `fim` para `periodo_fim`
       properties:
         nome:
           type: string
-          minLength: 1
         frequencia:
           type: string
+        continuo:
+          type: boolean
+        periodo_inicio:
+          type: string
+          format: date
         inicio:
           type: string
-          format: date-time
+          format: date
+        periodo_fim:
+          type: string
+          format: date
         fim:
           type: string
-          format: date-time
-        tipo:
-          type: integer
-        tomou:
-          type: integer
+          format: date
+        horarios:
+          type: string
+        notificacao_alerta:
+          type: string
+      required:
+        - nome
+      additionalProperties: true
 
     MedicacaoUpdateRequest:
-      type: object
-      additionalProperties: false
-      properties:
-        nome:
-          type: string
-        frequencia:
-          type: string
-        inicio:
-          type: string
-          format: date-time
-        fim:
-          type: string
-          format: date-time
-        tipo:
-          type: integer
-        tomou:
-          type: integer
-      description: Envie ao menos um dos campos acima. O campo `uuid` não é permitido.
+      allOf:
+        - $ref: "#/components/schemas/MedicacaoCreateRequest"
+      minProperties: 1
 
-    MedicacaoCreateResponse:
+    MedicacaoSingleResponse:
       type: object
-      additionalProperties: false
-      required: [Status, medicacao]
       properties:
         Status:
           type: string
-          example: created
+          example: success
         medicacao:
           $ref: "#/components/schemas/Medicacao"
+      required:
+        - Status
+        - medicacao
 
-    MedicacaoUpdateResponse:
+    MedicacaoMutationResponse:
       type: object
-      additionalProperties: false
-      required: [Status, medicacao]
       properties:
         Status:
           type: string
-          example: updated
+          enum:
+            - created
+            - updated
         medicacao:
           $ref: "#/components/schemas/Medicacao"
+      required:
+        - Status
+        - medicacao
 
     MedicacaoDeleteResponse:
       type: object
-      additionalProperties: false
-      required: [Status, medicacao]
       properties:
         Status:
           type: string
           example: deleted
         medicacao:
           $ref: "#/components/schemas/Medicacao"
+      required:
+        - Status
+        - medicacao
 
     MedicacaoListResponse:
       type: object
-      additionalProperties: false
-      required: [Status, total, medicacoes]
       properties:
         Status:
           type: string
           example: success
         total:
           type: integer
-          minimum: 0
         medicacoes:
           type: array
           items:
             $ref: "#/components/schemas/Medicacao"
+      required:
+        - Status
+        - total
+        - medicacoes
+
+    ControleMedicacao:
+      type: object
+      properties:
+        id_controle:
+          type: string
+          format: uuid
+        id_medicacoes:
+          type: string
+          format: uuid
+        tomou:
+          type:
+            - boolean
+            - "null"
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+      required:
+        - id_controle
+        - id_medicacoes
+
+    ControleMedicacaoCreateRequest:
+      type: object
+      properties:
+        id_medicacoes:
+          type: string
+          format: uuid
+        tomou:
+          type: boolean
+      required:
+        - id_medicacoes
+
+    ControleMedicacaoUpdateRequest:
+      type: object
+      properties:
+        id_medicacoes:
+          type: string
+          format: uuid
+        tomou:
+          type: boolean
+      minProperties: 1
+
+    ControleMedicacaoSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        controle_medicacao:
+          $ref: "#/components/schemas/ControleMedicacao"
+      required:
+        - Status
+        - controle_medicacao
+
+    ControleMedicacaoMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        controle_medicacao:
+          $ref: "#/components/schemas/ControleMedicacao"
+      required:
+        - Status
+        - controle_medicacao
+
+    ControleMedicacaoDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        controle_medicacao:
+          $ref: "#/components/schemas/ControleMedicacao"
+      required:
+        - Status
+        - controle_medicacao
+
+    ControleMedicacaoListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        controle_medicacoes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ControleMedicacao"
+      required:
+        - Status
+        - total
+        - controle_medicacoes
