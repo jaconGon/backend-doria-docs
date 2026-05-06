@@ -30,6 +30,7 @@ tags:
   - name: Registro de Dor
   - name: Especialistas
   - name: Especialista SBED
+  - name: Evolução
   - name: Clínicas
   - name: Convênios
   - name: Endereços
@@ -1122,6 +1123,184 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "440":
           $ref: "#/components/responses/IdleTimeout"
+
+            /evolucao:
+    post:
+      tags:
+        - Evolução
+      summary: Cria registro de evolução para o usuário autenticado
+      operationId: createEvolucao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvolucaoCreateRequest"
+      responses:
+        "201":
+          description: Evolução criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolucaoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags:
+        - Evolução
+      summary: Lista evoluções do usuário autenticado
+      operationId: listEvolucoes
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Lista de evoluções
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolucaoListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /evolucao/{id}:
+    get:
+      tags:
+        - Evolução
+      summary: Busca evolução por ID
+      operationId: getEvolucaoById
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Evolução encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolucaoSingleResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    patch:
+      tags:
+        - Evolução
+      summary: Atualiza evolução por ID
+      operationId: updateEvolucao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvolucaoUpdateRequest"
+      responses:
+        "200":
+          description: Evolução atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolucaoMutationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    delete:
+      tags:
+        - Evolução
+      summary: Remove evolução por ID
+      operationId: deleteEvolucao
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Evolução removida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolucaoDeleteResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /evolucao/por-id_usuario/{id_usuario}:
+    get:
+      tags:
+        - Evolução
+      summary: Lista evoluções por id_usuario
+      operationId: listEvolucoesByUsuario
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdUsuarioParam"
+      responses:
+        "200":
+          description: Lista de evoluções
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolucaoListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /especialistas:
     post:
@@ -2810,6 +2989,22 @@ components:
           type:
             - string
             - "null"
+        notif_medicacoes:
+          type:
+            - boolean
+            - "null"
+        notif_jornada:
+          type:
+            - boolean
+            - "null"
+        notif_avaliacao:
+          type:
+            - boolean
+            - "null"
+        notif_consultas:
+          type:
+            - boolean
+            - "null"
       required:
         - id_usuario
         - auth_id
@@ -2864,6 +3059,22 @@ components:
           type:
             - string
             - "null"
+        notif_medicacoes:
+          type:
+            - boolean
+            - "null"
+        notif_jornada:
+          type:
+            - boolean
+            - "null"
+        notif_avaliacao:
+          type:
+            - boolean
+            - "null"
+        notif_consultas:
+          type:
+            - boolean
+            - "null"
       required:
         - id_usuario
         - auth_id
@@ -2900,8 +3111,14 @@ components:
           type: integer
         area_de_atuacao:
           type: string
-        Área de Atuação:
-          type: string
+        notif_medicacoes:
+          type: boolean
+        notif_jornada:
+          type: boolean
+        notif_avaliacao:
+          type: boolean
+        notif_consultas:
+          type: boolean
       additionalProperties: true
 
     UsuarioSingleResponse:
@@ -3192,6 +3409,159 @@ components:
         - Status
         - total
         - registros
+
+        Evolucao:
+      type: object
+      properties:
+        id_avaliacao:
+          type: string
+          format: uuid
+        criado_em:
+          type:
+            - string
+            - "null"
+          format: date-time
+        id_usuario:
+          type: string
+          format: uuid
+        inicio:
+          type:
+            - string
+            - "null"
+        localizacao:
+          type:
+            - string
+            - "null"
+        duracao:
+          type:
+            - string
+            - "null"
+        caracteristica:
+          type:
+            - string
+            - "null"
+        fatores:
+          type:
+            - string
+            - "null"
+        irradiacao:
+          type:
+            - string
+            - "null"
+        padrao_temporal:
+          type:
+            - string
+            - "null"
+        sintomas_associados:
+          type:
+            - string
+            - "null"
+      required:
+        - id_avaliacao
+        - id_usuario
+
+    EvolucaoCreateRequest:
+      type: object
+      description: |
+        O dono é resolvido pela sessão.
+        Campos protegidos: `id_avaliacao`, `id_usuario`, `criado_em`, `created_at`.
+      properties:
+        inicio:
+          type: string
+        localizacao:
+          type: string
+        duracao:
+          type: string
+        caracteristica:
+          type: string
+        fatores:
+          type: string
+        irradiacao:
+          type: string
+        padrao_temporal:
+          type: string
+        sintomas_associados:
+          type: string
+      additionalProperties: true
+
+    EvolucaoUpdateRequest:
+      type: object
+      description: |
+        Campos protegidos: `id_avaliacao`, `id_usuario`, `criado_em`, `created_at`.
+      properties:
+        inicio:
+          type: string
+        localizacao:
+          type: string
+        duracao:
+          type: string
+        caracteristica:
+          type: string
+        fatores:
+          type: string
+        irradiacao:
+          type: string
+        padrao_temporal:
+          type: string
+        sintomas_associados:
+          type: string
+      minProperties: 1
+      additionalProperties: true
+
+    EvolucaoSingleResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        evolucao:
+          $ref: "#/components/schemas/Evolucao"
+      required:
+        - Status
+        - evolucao
+
+    EvolucaoMutationResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          enum:
+            - created
+            - updated
+        evolucao:
+          $ref: "#/components/schemas/Evolucao"
+      required:
+        - Status
+        - evolucao
+
+    EvolucaoDeleteResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: deleted
+        evolucao:
+          $ref: "#/components/schemas/Evolucao"
+      required:
+        - Status
+        - evolucao
+
+    EvolucaoListResponse:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        total:
+          type: integer
+        evolucoes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evolucao"
+      required:
+        - Status
+        - total
+        - evolucoes
 
     Especialista:
       type: object
