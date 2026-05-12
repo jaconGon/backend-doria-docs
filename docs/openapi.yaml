@@ -241,6 +241,136 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /auth/google:
+    post:
+      tags:
+        - Auth
+      summary: Login ou cadastro com Google
+      description: |
+        Valida um id_token do Google via Supabase Auth e cria uma sessão local do backend.
+
+        Este endpoint serve para:
+          - login de usuário Google já cadastrado;
+          - cadastro automático no primeiro acesso com Google.
+
+        Campos aceitos:
+          - id_token: token Google obrigatório, salvo se o alias token for usado.
+          - token: alias de id_token.
+          - nonce: opcional, repassado à validação Supabase.
+          - tipo: opcional; quando omitido, tende a ser tratado como "paciente".
+          - nome: opcional; usado como fallback se o Google não retornar nome.
+          - cpf: opcional; útil principalmente no cadastro de especialista.
+      operationId: postAuthGoogle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleAuthRequest"
+            examples:
+              login:
+                value:
+                  id_token: GOOGLE_ID_TOKEN
+              cadastroPaciente:
+                value:
+                  id_token: GOOGLE_ID_TOKEN
+                  tipo: paciente
+              cadastroEspecialista:
+                value:
+                  id_token: GOOGLE_ID_TOKEN
+                  tipo: especialista
+                  nome: Dr. João Especialista
+                  cpf: "12345678901"
+              usandoAliasToken:
+                value:
+                  token: GOOGLE_ID_TOKEN
+      responses:
+        "200":
+          description: Login/cadastro Google realizado e sessão local criada.
+          headers:
+            Set-Cookie:
+              description: Cookie HTTP-only "token" contendo JWT local.
+              schema:
+                type: string
+                example: token=eyJhbGciOiJIUzI1NiIs...; HttpOnly; Path=/
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoogleAuthSuccess"
+              examples:
+                login:
+                  value:
+                    Status: success
+                    status: success
+                    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    provider: google
+                    created: false
+                    mode: login
+                    user:
+                      id_usuario: 22222222-2222-4222-8222-222222222222
+                      auth_id: 11111111-1111-4111-8111-111111111111
+                      nome: Maria Paciente
+                      email: paciente@example.com
+                      tipo: paciente
+                      cpf: "12345678901"
+                      notif_medicacoes: true
+                      notif_jornada: true
+                      notif_avaliacao: false
+                      notif_consultas: true
+                signup:
+                  value:
+                    Status: success
+                    status: success
+                    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    provider: google
+                    created: true
+                    mode: signup
+                    user:
+                      id_usuario: 22222222-2222-4222-8222-222222222222
+                      auth_id: 11111111-1111-4111-8111-111111111111
+                      nome: Maria Paciente
+                      email: paciente@example.com
+                      tipo: paciente
+                      cpf: null
+                      notif_medicacoes: null
+                      notif_jornada: null
+                      notif_avaliacao: null
+                      notif_consultas: null
+        "400":
+          description: Token Google ausente ou conta Google sem e-mail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                idTokenObrigatorio:
+                  value:
+                    Error: id_token do Google é obrigatório.
+                    error: id_token do Google é obrigatório.
+                emailAusente:
+                  value:
+                    Error: A conta Google não retornou e-mail.
+                    error: A conta Google não retornou e-mail.
+        "401":
+          description: Token Google inválido ou rejeitado pelo Supabase Auth.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                tokenInvalido:
+                  value:
+                    Error: Token Google inválido ou sem usuário no Supabase.
+                    error: Token Google inválido ou sem usuário no Supabase.
+        "500":
+          description: Falha ao criar ou recuperar perfil usuario a partir do Google.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                Error: Falha ao criar ou recuperar perfil usuario a partir do Google.
+                error: Falha ao criar ou recuperar perfil usuario a partir do Google.
   /auth/session:
     post:
       tags:
@@ -4763,6 +4893,114 @@ components:
             tipo:
               type: string
               nullable: true
+
+    GoogleAuthRequest:
+      type: object
+      description: |
+        Payload de login/cadastro com Google. O backend aceita id_token ou token como alias.
+      anyOf:
+        - required:
+            - id_token
+        - required:
+            - token
+      properties:
+        id_token:
+          type: string
+          description: ID token emitido pelo Google.
+        token:
+          type: string
+          description: Alias aceito pelo backend para id_token.
+        nonce:
+          type: string
+          description: Nonce opcional usado na validação do id_token.
+        tipo:
+          type: string
+          enum:
+            - paciente
+            - especialista
+          default: paciente
+        nome:
+          type: string
+          description: Nome opcional usado como fallback no cadastro do perfil.
+        cpf:
+          type: string
+          description: CPF com 11 dígitos, preferencialmente sem pontuação.
+          example: "12345678901"
+      additionalProperties: true
+
+    GoogleAuthSuccess:
+      type: object
+      required:
+        - Status
+        - status
+        - token
+        - user
+        - provider
+        - created
+        - mode
+      properties:
+        Status:
+          type: string
+          example: success
+        status:
+          type: string
+          example: success
+        token:
+          type: string
+          description: JWT local do backend.
+        user:
+          type: object
+          required:
+            - id_usuario
+            - auth_id
+            - email
+            - tipo
+          properties:
+            id_usuario:
+              type: string
+              format: uuid
+            auth_id:
+              type: string
+              format: uuid
+            nome:
+              type: string
+              nullable: true
+            email:
+              type: string
+              format: email
+            tipo:
+              type: string
+              nullable: true
+              example: paciente
+            cpf:
+              type: string
+              nullable: true
+              example: "12345678901"
+            notif_medicacoes:
+              type: boolean
+              nullable: true
+            notif_jornada:
+              type: boolean
+              nullable: true
+            notif_avaliacao:
+              type: boolean
+              nullable: true
+            notif_consultas:
+              type: boolean
+              nullable: true
+        provider:
+          type: string
+          enum:
+            - google
+        created:
+          type: boolean
+          description: Indica se o perfil usuario foi criado neste acesso Google.
+        mode:
+          type: string
+          enum:
+            - signup
+            - login
+          description: 'signup quando created=true; login quando created=false.'
 
     AccessTokenRequest:
       type: object
