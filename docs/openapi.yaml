@@ -3183,7 +3183,128 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 Error: Falha ao consultar serviço de certificação profissional.
+                
+  /certificar_especialista_sbed:
+    post:
+      tags:
+        - Especialistas
+      summary: Certificar especialista SBED por CPF
+      description: |
+        Valida o CPF informado na tabela doria.validacao_doria e marca o especialista
+        autenticado como especialista SBED.
 
+        Regras:
+          - Exige sessão autenticada não anônima.
+          - Aceita autenticação via cookie HTTP-only "token" ou via header Authorization Bearer.
+          - Recebe um CPF no body.
+          - O CPF pode ser enviado somente com números ou com máscara.
+          - O backend normaliza o CPF para 11 dígitos.
+          - Busca o CPF na tabela doria.validacao_doria, coluna CPF.
+          - Se encontrar o CPF com validado = false ou null:
+              - atualiza doria.validacao_doria.validado = true;
+              - atualiza doria.especialistas.especialista_sbed = true
+                para o especialista mais recente do usuário autenticado;
+              - retorna sucesso.
+          - Se encontrar o CPF com validado = true, retorna 409.
+          - Se não encontrar o CPF em doria.validacao_doria, retorna 404.
+
+        Observação:
+          - O endpoint deve ser usado no fluxo de certificação SBED.
+          - O CPF informado deve corresponder ao CPF do usuário autenticado, caso essa
+            validação de segurança tenha sido implementada no service.
+      operationId: postCertificarEspecialistaSbed
+      security:
+        - CookieAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertificarEspecialistaSbedRequest"
+            examples:
+              cpfNumerico:
+                value:
+                  cpf: "12345678901"
+              cpfComMascara:
+                value:
+                  cpf: "123.456.789-01"
+      responses:
+        "200":
+          description: Especialista SBED certificado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertificarEspecialistaSbedSuccess"
+              example:
+                Status: success
+                message: especialista sbed certificado com sucesso
+                especialista:
+                  id_especialista: 99999999-9999-4999-8999-999999999999
+                  especialista_sbed: true
+                validacao:
+                  id: 1
+                  Nome: João Silva
+                  CPF: 12345678901
+                  validado: true
+        "400":
+          description: CPF inválido ou CPF do usuário autenticado ausente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                cpfInvalido:
+                  value:
+                    Error: CPF inválido. Envie um CPF com 11 dígitos.
+                cpfUsuarioAusente:
+                  value:
+                    Error: CPF do usuário autenticado não está cadastrado.
+        "401":
+          description: Sessão inválida, anônima ou ausente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                Error: Sessão inválida para certificação SBED.
+        "403":
+          description: CPF informado não pertence ao usuário autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                Error: CPF informado não corresponde ao CPF do usuário autenticado.
+        "404":
+          description: CPF não encontrado na base SBED ou especialista não encontrado para o usuário.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                sbedNaoEncontrado:
+                  value:
+                    Error: especialista SBed não encontrado
+                especialistaNaoEncontrado:
+                  value:
+                    Error: Especialista não encontrado para o usuário autenticado.
+        "409":
+          description: CPF já validado anteriormente na tabela doria.validacao_doria.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                Error: especialista já validado
+        "440":
+          $ref: "#/components/responses/IdleTimeout"
+        "500":
+          description: Falha ao consultar ou atualizar dados no Supabase.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /especialistas:
     post:
       tags:
@@ -6068,7 +6189,63 @@ components:
           additionalProperties: true
         profissional:
           $ref: "#/components/schemas/ProfissionalCertificacao"
+    CertificarEspecialistaSbedRequest:
+      type: object
+      required:
+        - cpf
+      properties:
+        cpf:
+          type: string
+          description: CPF do especialista. Pode ser enviado com ou sem máscara.
+          example: "12345678901"
+          minLength: 11
+          maxLength: 14
+      additionalProperties: false
 
+    ValidacaoDoria:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        Nome:
+          type: string
+          nullable: true
+          example: João Silva
+        CPF:
+          type: integer
+          format: int64
+          nullable: true
+          example: 12345678901
+        validado:
+          type: boolean
+          nullable: true
+          example: true
+      additionalProperties: true
+
+    CertificarEspecialistaSbedSuccess:
+      type: object
+      properties:
+        Status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: especialista sbed certificado com sucesso
+        especialista:
+          type: object
+          properties:
+            id_especialista:
+              type: string
+              format: uuid
+            especialista_sbed:
+              type: boolean
+              example: true
+          additionalProperties: true
+        validacao:
+          $ref: "#/components/schemas/ValidacaoDoria"
+          
     Especialista:
       type: object
       properties:
@@ -6116,6 +6293,11 @@ components:
           type: string
           format: date-time
           nullable: true
+        especialista_sbed:
+          type: boolean
+          nullable: true
+          description: Indica se o especialista foi certificado como especialista SBED.
+          example: true
       additionalProperties: true
 
     EspecialistaCreateRequest:
@@ -6130,6 +6312,7 @@ components:
           - created_at
           - verificado
           - ultima_tentativa_verificacao
+          - especialista_sbed
       properties:
         profissao:
           type: string
